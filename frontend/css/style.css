@@ -789,3 +789,205 @@ body {
         padding: 50px 18px;
     }
 }
+
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Skip link (screen reader uchun) */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    padding: 8px 16px;
+    background-color: var(--color-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 0 0 var(--radius-md) 0;
+    font-weight: 600;
+    z-index: 9999;
+    transition: top var(--transition);
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Focus visible (klaviatura navigatsiyasi) */
+*:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* Tugmalar uchun aniq focus */
+.btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Input va textarea uchun */
+.prompt-input:focus-visible,
+.table-title-input:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 0;
+}
+
+/* Reduced motion (foydalanuvchi animatsiyalarni o'chirgan bo'lsa) */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ============================================
+   MOBILE SAYQAL (kichik ekranlar)
+   ============================================ */
+
+@media (max-width: 480px) {
+    /* Header */
+    .header__container {
+        padding: 0 12px;
+    }
+
+    .header__logo {
+        width: 32px;
+        height: 32px;
+    }
+
+    .header__title {
+        font-size: 16px;
+    }
+
+    .badge {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+
+    /* Container */
+    .container {
+        padding: 0 12px;
+    }
+
+    .main {
+        padding: 20px 0 30px;
+    }
+
+    /* Card */
+    .card {
+        border-radius: var(--radius-md);
+        margin-bottom: 16px;
+    }
+
+    .card__header {
+        padding: 16px 14px 12px;
+    }
+
+    .card__body {
+        padding: 14px;
+    }
+
+    .card__title {
+        font-size: 16px;
+    }
+
+    /* Prompt */
+    .prompt-input {
+        min-height: 80px;
+        font-size: 14px;
+        padding: 12px 14px;
+    }
+
+    .prompt-section__footer {
+        gap: 10px;
+    }
+
+    .btn--primary {
+        width: 100%;
+        padding: 12px 16px;
+    }
+
+    /* Action panel */
+    .action-panel {
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+    }
+
+    .action-panel .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Table */
+    .table-wrapper {
+        border-radius: var(--radius-sm);
+        margin: 0 -14px;  /* Card padding'ini "yutish" */
+    }
+
+    .data-table {
+        font-size: 13px;
+        min-width: 400px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px 10px;
+    }
+
+    .data-table th {
+        font-size: 11px;
+    }
+
+    /* Empty state */
+    .empty-state {
+        padding: 40px 16px;
+    }
+
+    .empty-state__icon {
+        font-size: 40px;
+    }
+
+    /* Footer */
+    .footer {
+        padding: 14px 0;
+    }
+
+    .footer__text {
+        font-size: 12px;
+    }
+}
+
+/* Landscape mobil */
+@media (max-width: 900px) and (orientation: landscape) {
+    .main {
+        padding: 16px 0 24px;
+    }
+}
+
+/* Print uchun */
+@media print {
+    .header,
+    .footer,
+    .action-panel,
+    .prompt-section,
+    .alert,
+    .row-delete-btn {
+        display: none !important;
+    }
+
+    .table-section {
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+
+    .data-table {
+        font-size: 11px;
+    }
+}

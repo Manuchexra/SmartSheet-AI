@@ -619,6 +619,9 @@ async function handleGenerate() {
     hideAlert();
     setLoading(true);
 
+    const startTime = Date.now();
+    const MIN_LOADING_MS = 400;  // Spinner kamida 400ms ko'rinadi
+
     try {
         const tableData = await requestTableGeneration(prompt);
         renderTable(tableData);
@@ -633,6 +636,11 @@ async function handleGenerate() {
             el.tableSection.hidden = false;
         }
     } finally {
+        // Minimal loading vaqti (UX uchun)
+        const elapsed = Date.now() - startTime;
+        if (elapsed < MIN_LOADING_MS) {
+            await new Promise((r) => setTimeout(r, MIN_LOADING_MS - elapsed));
+        }
         setLoading(false);
     }
 }
