@@ -85,6 +85,9 @@ def build_table_response(
     return response
 
 
+# ============================================
+# YORDAMCHI FUNKSIYA
+# ============================================
 def validate_table_data(data: dict) -> TableData:
     """
     Xom dict'ni TableData'ga aylantirish va validatsiya qilish.
