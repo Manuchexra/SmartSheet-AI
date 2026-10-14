@@ -1,0 +1,41 @@
+# --- Virtual muhit ---
+venv/
+env/
+.venv/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# --- Environment (MAXFIY!) ---
+.env
+.env.local
+.env.*.local
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Test ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Excel (test natijalari) ---
+*.xlsx
+!tests/fixtures/*.xlsx
+
+# --- Docker ---
+docker-compose.override.yml

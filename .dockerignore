@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Virtual muhit
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Environment (MAXFIY!)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Hujjatlar
+README.md
+*.md
+
+# Excel fayllar
+*.xlsx
+!tests/fixtures/*.xlsx
+
+# Frontend (backend image'ida kerak emas)
+frontend/
