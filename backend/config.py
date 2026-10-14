@@ -9,12 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    Ilova sozlamalari.
-
-    Har bir maydon .env faylidagi kalitga mos keladi.
-    Masalan: app_name <-> APP_NAME
-    """
+    """Ilova sozlamalari."""
 
     # --- Ilova ---
     app_name: str = "SmartSheet AI"

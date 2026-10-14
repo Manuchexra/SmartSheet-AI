@@ -1,51 +1,31 @@
-# ============================================
-# SmartSheet AI — Docker Compose
-# ============================================
-
 services:
   backend:
-    # Image nomi
     image: smartsheet-ai-backend:latest
     container_name: smartsheet_backend
-
-    # Dockerfile joylashgan papka
     build:
       context: .
       dockerfile: Dockerfile
-
-    # Port mapping: host:container
     ports:
       - "8000:8000"
-
-    # Environment o'zgaruvchilari (.env faylidan)
     env_file:
       - .env
-
-    # Volume — kod o'zgarishini real vaqtda ko'rish uchun
-    # (development rejimida --reload ishlatiladi)
     volumes:
       - ./backend:/app/backend
+      - ./frontend:/app/frontend    # ← YANGI
       - ./tests:/app/tests
-
-    # Avtomatik qayta ishga tushish
     restart: unless-stopped
-
-    # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-
-    # Log sozlamalari
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-# Volume'lar (kelajakda database qo'shsak kerak bo'ladi)
 volumes:
   smartsheet_data:
     driver: local

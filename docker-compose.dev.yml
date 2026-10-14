@@ -1,25 +1,14 @@
-# ============================================
-# SmartSheet AI — Development Override
-# Ishlatish: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-# ============================================
-
 services:
   backend:
     build:
       context: .
       dockerfile: Dockerfile.dev
-
-    # Development'da ko'proq papkalar ulansin
     volumes:
       - ./backend:/app/backend
+      - ./frontend:/app/frontend    # ← allaqachon bor edi
       - ./tests:/app/tests
-      - ./frontend:/app/frontend
-
-    # Environment
     environment:
       - APP_ENV=development
       - PYTHONUNBUFFERED=1
-
-    # Development'da stdin ochiq bo'lsin (debugger uchun)
     stdin_open: true
     tty: true

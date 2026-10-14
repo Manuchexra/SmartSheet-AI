@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SmartSheet AI — Turn your ideas into Excel spreadsheets">
+    <title>SmartSheet AI — AI-Powered Spreadsheet Generator</title>
+    
+    <!-- Logo (favicon) -->
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- ============================================
+         HEADER
+         ============================================ -->
+    <header class="header">
+        <div class="header__container">
+            <div class="header__brand">
+                <img src="/assets/logo.svg" alt="SmartSheet AI" class="header__logo">
+                <div class="header__text">
+                    <h1 class="header__title">SmartSheet AI</h1>
+                    <p class="header__subtitle">Turn your ideas into Excel spreadsheets</p>
+                </div>
+            </div>
+            <span class="badge badge--mvp">MVP</span>
+        </div>
+    </header>
+
+    <!-- ============================================
+         MAIN
+         ============================================ -->
+    <main class="main">
+        <div class="container">
+
+            <!-- ============================================
+                 PROMPT SECTION
+                 ============================================ -->
+            <section class="card prompt-section">
+                <div class="card__header">
+                    <h2 class="card__title">What would you like to create?</h2>
+                    <p class="card__subtitle">
+                        Describe your spreadsheet in plain language — 
+                        AI will build the structure for you.
+                    </p>
+                </div>
+
+                <div class="card__body">
+                    <label for="prompt-input" class="sr-only">Prompt</label>
+                    <textarea
+                        id="prompt-input"
+                        class="prompt-input"
+                        placeholder="Misol: Talabalar uchun jadval yarat. Ism, familiya, fan, ball va natija ustunlari bo'lsin. 10 ta namunaviy qator qo'sh."
+                        rows="4"
+                        maxlength="2000"
+                    ></textarea>
+
+                    <div class="prompt-section__footer">
+                        <div class="prompt-section__hint">
+                            <span id="char-counter" class="char-counter">0 / 2000</span>
+                        </div>
+                        <button
+                            id="generate-btn"
+                            class="btn btn--primary"
+                            type="button"
+                        >
+                            <span class="btn__icon" aria-hidden="true">✨</span>
+                            <span class="btn__label">Generate Table</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================
+                 ALERT (xatolik/xabar ko'rsatish)
+                 ============================================ -->
+            <div id="alert" class="alert" role="alert" hidden>
+                <span class="alert__icon" aria-hidden="true">⚠️</span>
+                <span class="alert__message" id="alert-message"></span>
+                <button class="alert__close" id="alert-close" aria-label="Close">×</button>
+            </div>
+
+            <!-- ============================================
+                 LOADING
+                 ============================================ -->
+            <div id="loading" class="loading" hidden>
+                <div class="spinner" aria-hidden="true"></div>
+                <p class="loading__text">Generating your table...</p>
+            </div>
+
+            <!-- ============================================
+                 EMPTY STATE (jadval hali yo'q)
+                 ============================================ -->
+            <section id="empty-state" class="empty-state">
+                <div class="empty-state__icon" aria-hidden="true">📊</div>
+                <h3 class="empty-state__title">No table yet</h3>
+                <p class="empty-state__text">
+                    Describe what you need above and click <strong>Generate Table</strong>.
+                </p>
+            </section>
+
+            <!-- ============================================
+                 TABLE PREVIEW (6-bosqich: Action Panel qo'shildi)
+                 ============================================ -->
+            <section id="table-section" class="card table-section" hidden>
+                <div class="card__header table-section__header">
+                    <div class="table-section__title-group">
+                        <!-- Jadval nomi — tahrirlanadigan -->
+                        <input
+                            type="text"
+                            id="table-title"
+                            class="table-title-input"
+                            value="—"
+                            maxlength="200"
+                            aria-label="Table title"
+                            placeholder="Untitled table"
+                        >
+                        <p class="card__subtitle">
+                            <span id="table-meta">—</span>
+                            <span id="table-edited-indicator" class="edited-indicator" hidden>
+                                · o'zgartirilgan
+                            </span>
+                        </p>
+                    </div>
+
+                    <!-- ============================================
+                         ACTION PANEL (YANGI — 6-bosqich)
+                         ============================================ -->
+                    <div class="action-panel">
+                        <button
+                            id="undo-btn"
+                            class="btn btn--ghost"
+                            type="button"
+                            title="Undo last action (Ctrl+Z)"
+                            disabled
+                        >
+                            <span class="btn__icon" aria-hidden="true">↶</span>
+                            <span class="btn__label">Undo</span>
+                        </button>
+                        <button
+                            id="add-row-btn"
+                            class="btn btn--ghost"
+                            type="button"
+                            title="Add a new row"
+                        >
+                            <span class="btn__icon" aria-hidden="true">＋</span>
+                            <span class="btn__label">Add Row</span>
+                        </button>
+                        <button
+                            id="download-excel-btn"
+                            class="btn btn--primary"
+                            type="button"
+                            title="Download as Excel (.xlsx)"
+                        >
+                            <span class="btn__icon" aria-hidden="true">📥</span>
+                            <span class="btn__label">Download Excel</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card__body">
+                    <div class="table-wrapper">
+                        <table id="data-table" class="data-table">
+                            <thead id="data-table-head"></thead>
+                            <tbody id="data-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- ============================================
+         FOOTER
+         ============================================ -->
+    <footer class="footer">
+        <div class="footer__container">
+            <p class="footer__text">
+                SmartSheet AI &copy; 2024 — MVP 1.0
+            </p>
+        </div>
+    </footer>
+
+    <!-- ============================================
+         SCRIPTS
+         ============================================ -->
+    <script src="/js/app.js"></script>
+</body>
+</html>
