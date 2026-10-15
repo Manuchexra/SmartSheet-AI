@@ -182,6 +182,21 @@
             <!-- Chat footer (xabar yozish) -->
             <footer class="chat-footer">
                 <div class="chat-input-wrapper">
+                    <input
+                        id="table-file-input"
+                        class="sr-only"
+                        type="file"
+                        accept=".xlsx,.csv"
+                    >
+                    <button
+                        id="upload-table-btn"
+                        class="btn btn--ghost btn--icon"
+                        type="button"
+                        title="Excel yoki CSV jadvalini yuklash"
+                        aria-label="Excel yoki CSV jadvalini yuklash"
+                    >
+                        <span class="btn__icon" aria-hidden="true">📎</span>
+                    </button>
                     <label for="prompt-input" class="sr-only">Xabar</label>
                     <textarea
                         id="prompt-input"
@@ -239,6 +254,41 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <div
+        id="excel-save-dialog"
+        class="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="excel-save-title"
+        aria-describedby="excel-save-message"
+        hidden
+    >
+        <form id="excel-save-form" class="confirm-dialog__panel">
+            <h2 id="excel-save-title" class="confirm-dialog__title">Excel faylini saqlash</h2>
+            <p id="excel-save-message" class="confirm-dialog__message">
+                Yuklab olinadigan fayl nomini kiriting.
+            </p>
+            <input
+                id="excel-filename-input"
+                class="excel-save__input"
+                type="text"
+                maxlength="200"
+                required
+                autocomplete="off"
+                aria-label="Excel fayli nomi"
+            >
+            <p id="excel-save-error" class="excel-save__error" role="alert" hidden></p>
+            <div class="confirm-dialog__actions">
+                <button id="excel-save-cancel" class="btn btn--ghost" type="button">
+                    Bekor qilish
+                </button>
+                <button class="btn btn--primary" type="submit">
+                    Yuklab olish
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- ============================================

@@ -9,6 +9,8 @@ Bu modul:
 
 from pydantic import BaseModel, Field
 
+from backend.modules.styles.schemas import TableStyles
+
 
 # ============================================
 # AI'GA SO'ROV
@@ -23,9 +25,9 @@ class AIRequest(BaseModel):
     )
 
     max_rows: int = Field(
-        default=100,
+        default=200,
         ge=1,
-        le=1000,
+        le=200,
         description="Maksimal qatorlar soni",
     )
 
@@ -46,6 +48,7 @@ class AIResponse(BaseModel):
     title: str = Field(..., description="Jadval nomi")
     columns: list[str] = Field(..., min_length=1, description="Ustunlar")
     rows: list[list] = Field(..., min_length=1, description="Qatorlar")
+    styles: TableStyles = Field(default_factory=TableStyles, description="Jadval uslublari")
 
 
 # ============================================

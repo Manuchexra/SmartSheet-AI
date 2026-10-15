@@ -14,12 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
-from backend.modules.chats.schemas import (
-    ChatCreate,
-    ChatListResponse,
-    ChatResponse,
-    ChatUpdate,
-)
+from backend.modules.chats.dependencies import get_browser_id
 from backend.modules.chats.service import (
     create_chat,
     delete_chat,
@@ -27,8 +22,6 @@ from backend.modules.chats.service import (
     get_chats,
     update_chat,
 )
-
-from backend.modules.ai.schemas import AIError, AIRequest
 from backend.modules.ai.service import (
     generate_edit_with_ai,
     generate_with_ai,
@@ -72,11 +65,12 @@ router = APIRouter(prefix="/chats", tags=["Chats"])
 )
 def create_chat_endpoint(
     payload: ChatCreate,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> ChatResponse:
     """Yangi chat yaratish."""
     try:
-        chat = create_chat(db, title=payload.title)
+        chat = create_chat(db, browser_id=browser_id, title=payload.title)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -98,10 +92,11 @@ def create_chat_endpoint(
 def list_chats_endpoint(
     skip: int = Query(0, ge=0, description="O'tkazib yuborish"),
     limit: int = Query(50, ge=1, le=100, description="Limit"),
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> ChatListResponse:
     """Chatlar ro'yxatini olish."""
-    chats, total = get_chats(db, skip=skip, limit=limit)
+    chats, total = get_chats(db, browser_id=browser_id, skip=skip, limit=limit)
 
     return ChatListResponse(
         chats=[ChatResponse.from_model(c) for c in chats],
@@ -120,10 +115,11 @@ def list_chats_endpoint(
 )
 def get_chat_endpoint(
     chat_id: int,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> ChatResponse:
     """Bitta chatni olish."""
-    chat = get_chat(db, chat_id)
+    chat = get_chat(db, chat_id, browser_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -144,10 +140,11 @@ def get_chat_endpoint(
 def update_chat_endpoint(
     chat_id: int,
     payload: ChatUpdate,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> ChatResponse:
     """Chatni tahrirlash."""
-    chat = update_chat(db, chat_id, title=payload.title)
+    chat = update_chat(db, chat_id, browser_id, title=payload.title)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -167,10 +164,11 @@ def update_chat_endpoint(
 )
 def delete_chat_endpoint(
     chat_id: int,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> None:
     """Chatni o'chirish."""
-    deleted = delete_chat(db, chat_id)
+    deleted = delete_chat(db, chat_id, browser_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -194,6 +192,7 @@ def delete_chat_endpoint(
 def chat_generate_endpoint(
     chat_id: int,
     payload: ChatGenerateRequest,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> ChatGenerateResponse:
     """
@@ -209,7 +208,7 @@ def chat_generate_endpoint(
     7. Javob qaytarish
     """
     # 1. Chat mavjudligini tekshirish
-    chat = get_chat(db, chat_id)
+    chat = get_chat(db, chat_id, browser_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -244,6 +243,7 @@ def chat_generate_endpoint(
                     "title": existing_table.title,
                     "columns": existing_table.columns,
                     "rows": existing_table.rows,
+                    "styles": existing_table.styles,
                 },
             )
         else:
@@ -270,6 +270,7 @@ def chat_generate_endpoint(
             title=ai_response.title,
             columns=ai_response.columns,
             rows=ai_response.rows,
+            styles=ai_response.styles.model_dump(mode="json", exclude_none=True),
             source=source,
         )
     except ValueError as e:
@@ -280,7 +281,7 @@ def chat_generate_endpoint(
         ) from e
 
     if chat.title == "Yangi chat":
-        chat = update_chat(db, chat_id, title=table.title)
+        chat = update_chat(db, chat_id, browser_id, title=table.title)
 
     # 6. AI xabarini saqlash
     ai_content = f"Jadval yaratildi: {table.title} ({len(table.rows)} qator)"

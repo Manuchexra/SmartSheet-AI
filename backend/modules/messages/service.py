@@ -133,10 +133,15 @@ def get_messages(
 # ============================================
 # XABARNI O'CHIRISH
 # ============================================
-def delete_message(db: Session, message_id: int) -> bool:
-    """Xabarni o'chirish."""
-    message = db.get(Message, message_id)
-    if not message:
+def delete_message(db: Session, chat_id: int, message_id: int) -> bool:
+    """Delete a message only when it belongs to the specified chat."""
+    message = db.scalar(
+        select(Message).where(
+            Message.id == message_id,
+            Message.chat_id == chat_id,
+        )
+    )
+    if message is None:
         return False
 
     db.delete(message)

@@ -55,6 +55,40 @@ class TestGenerateExcel:
 
         header = ws["A1"]
         assert header.font.bold is True
+        assert ws["A1"].border.left.color.rgb.endswith("000000")
+        assert ws["A2"].border.bottom.color.rgb.endswith("000000")
+
+    def test_custom_styles_are_exported(self):
+        """Header, column, row, and border styles are retained in Excel."""
+        from backend.modules.table_generator.schemas import TableData
+
+        data = TableData(
+            title="Styled",
+            columns=["Ism", "Maosh"],
+            rows=[["Ali", 5000], ["Vali", 4000]],
+            styles={
+                "header": {
+                    "bg_color": "#000000",
+                    "text_color": "#FFFFFF",
+                    "alignment": "right",
+                },
+                "body": {
+                    "border_style": "thick",
+                    "border_color": "#000000",
+                    "border_sides": ["top", "bottom", "left", "right"],
+                },
+                "columns": {"Maosh": {"bg_color": "#16A34A"}},
+                "rows": {"1": {"text_color": "#DC2626"}},
+                "alternate_rows": False,
+            },
+        )
+        ws = load_workbook(generate_excel(data)).active
+
+        assert ws["A1"].fill.fgColor.rgb.endswith("000000")
+        assert ws["A1"].font.color.rgb.endswith("FFFFFF")
+        assert ws["B2"].fill.fgColor.rgb.endswith("16A34A")
+        assert ws["A3"].font.color.rgb.endswith("DC2626")
+        assert ws["A2"].border.left.style == "thick"
 
     def test_freeze_panes(self, sample_table_data):
         """Freeze panes sozlangan bo'lishi kerak."""
@@ -173,6 +207,27 @@ class TestExcelEndpoint:
         assert wb.calculation.calcMode == "auto"
         assert wb.calculation.fullCalcOnLoad is True
         assert wb.calculation.forceFullCalc is True
+
+    def test_export_style_request(self, client):
+        """API eksportida maxsus ko'rinish va qora default border saqlansin."""
+        response = client.post(
+            "/api/v1/excel/export",
+            json={
+                "title": "Styled",
+                "columns": ["Ism", "Maosh"],
+                "rows": [["Ali", 5000]],
+                "styles": {
+                    "header": {"bg_color": "#112233"},
+                    "columns": {"Maosh": {"bg_color": "#16A34A"}},
+                },
+            },
+        )
+        assert response.status_code == 200
+        ws = load_workbook(BytesIO(response.content)).active
+        assert ws["A1"].fill.fgColor.rgb.endswith("112233")
+        assert ws["B1"].fill.fgColor.rgb.endswith("16A34A")
+        assert ws["B2"].fill.fgColor.rgb.endswith("16A34A")
+        assert ws["B2"].border.left.color.rgb.endswith("FF000000")
 
     def test_export_disposition(self, client):
         """Content-Disposition sarlavhasi to'g'ri bo'lishi kerak."""

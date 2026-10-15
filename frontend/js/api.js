@@ -7,6 +7,16 @@
 'use strict';
 
 const API_BASE_URL = '/api/v1';
+const CLIENT_ID_STORAGE_KEY = 'smartsheet_client_id';
+
+function getClientId() {
+    let clientId = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
+    if (!clientId) {
+        clientId = crypto.randomUUID();
+        localStorage.setItem(CLIENT_ID_STORAGE_KEY, clientId);
+    }
+    return clientId;
+}
 
 /**
  * Umumiy fetch wrapper.
@@ -14,11 +24,12 @@ const API_BASE_URL = '/api/v1';
 async function apiFetch(path, options = {}) {
     const url = `${API_BASE_URL}${path}`;
     const config = {
+        ...options,
         headers: {
             'Content-Type': 'application/json',
+            'X-Client-ID': getClientId(),
             ...(options.headers || {}),
         },
-        ...options,
     };
 
     if (config.body && typeof config.body === 'object') {
@@ -143,6 +154,26 @@ const TableAPI = {
         });
     },
 
+    /** Excel yoki CSV faylini chat jadvali sifatida import qilish */
+    async upload(chatId, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(`${API_BASE_URL}/chats/${chatId}/table/upload`, {
+            method: 'POST',
+            headers: { 'X-Client-ID': getClientId() },
+            body: formData,
+        });
+        if (!response.ok) {
+            let detail = `Fayl yuklashda xato (${response.status})`;
+            try {
+                const errorData = await response.json();
+                if (errorData.detail) detail = errorData.detail;
+            } catch (_) { /* non-JSON errors retain the status message */ }
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
     /** O'chirish */
     async delete(chatId) {
         return apiFetch(`/chats/${chatId}/table`, {
@@ -172,7 +203,10 @@ const ExcelAPI = {
     async export(table) {
         const response = await fetch(`${API_BASE_URL}/excel/export`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Client-ID': getClientId(),
+            },
             body: JSON.stringify(table),
         });
 

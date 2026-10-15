@@ -50,6 +50,12 @@ class Chat(Base):
         index=True,  # Qidiruv uchun indeks
     )
 
+    browser_id: Mapped[str | None] = mapped_column(
+        String(36),
+        nullable=True,
+        index=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -5,7 +5,9 @@ Excel eksport so'rovini belgilaydi.
 """
 
 from pydantic import BaseModel, Field
+from typing import Any
 
+from backend.modules.styles.defaults import default_styles
 from backend.modules.table_generator.schemas import TableData
 
 
@@ -33,10 +35,12 @@ class ExcelExportRequest(BaseModel):
         description="Ustun sarlavhalari",
     )
     
-    rows: list[list] = Field(
+    rows: list[list[Any]] = Field(
         ...,
         description="Qatorlar ma'lumotlari",
     )
+
+    styles: dict = Field(default_factory=default_styles, description="Jadval uslublari")
     
     def to_table_data(self) -> TableData:
         """
@@ -49,4 +53,5 @@ class ExcelExportRequest(BaseModel):
             title=self.title,
             columns=self.columns,
             rows=self.rows,
+            styles=self.styles,
         )

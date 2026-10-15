@@ -2,10 +2,12 @@
 Chat generate (AI) testlari.
 """
 
+from io import BytesIO
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 from backend.modules.ai.schemas import AIResponse
 
@@ -17,6 +19,50 @@ class TestChatGenerate:
     def _create_chat(self, client: TestClient, title: str = "Test") -> int:
         response = client.post("/api/v1/chats", json={"title": title})
         return response.json()["id"]
+
+    @patch("backend.api.endpoints.chats.generate_edit_with_ai")
+    def test_uploaded_table_is_available_to_following_ai_edit(
+        self, mock_edit, client: TestClient
+    ):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Xodimlar"
+        worksheet.append(["Ism", "Maosh"])
+        worksheet.append(["Ali", 5000])
+        file_content = BytesIO()
+        workbook.save(file_content)
+
+        chat_id = self._create_chat(client, title="Yangi chat")
+        upload_response = client.post(
+            f"/api/v1/chats/{chat_id}/table/upload",
+            files={
+                "file": (
+                    "xodimlar.xlsx",
+                    file_content.getvalue(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ),
+            },
+        )
+        assert upload_response.status_code == 200
+
+        mock_edit.return_value = (
+            AIResponse(
+                title="Xodimlar",
+                columns=["Ism", "Maosh"],
+                rows=[["Ali", 5500]],
+            ),
+            "ai",
+        )
+        response = client.post(
+            f"/api/v1/chats/{chat_id}/generate",
+            json={"prompt": "Maoshni 10 foiz oshir"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["table"]["rows"] == [["Ali", 5500]]
+        existing_table = mock_edit.call_args.kwargs["existing_table"]
+        assert existing_table["columns"] == ["Ism", "Maosh"]
+        assert existing_table["rows"] == [["Ali", 5000]]
 
     @patch("backend.api.endpoints.chats.generate_with_ai")
     def test_generate_first_time(self, mock_ai, client: TestClient):
@@ -126,6 +172,23 @@ class TestChatGenerate:
 
         table_response = client.get(f"/api/v1/chats/{chat_id}/table")
         assert table_response.status_code == 404
+
+    def test_generate_greeting_does_not_create_sample_data(
+        self, client: TestClient
+    ):
+        """Oddiy salomlashuv namuna ma'lumotli jadval yaratmasligi kerak."""
+        chat_id = self._create_chat(client, title="Yangi chat")
+
+        response = client.post(
+            f"/api/v1/chats/{chat_id}/generate",
+            json={"prompt": "salom"},
+        )
+
+        assert response.status_code == 200
+        table = response.json()["table"]
+        assert table["title"] == "salom"
+        assert table["columns"] == ["Matn"]
+        assert table["rows"] == [["salom"]]
 
     @patch("backend.api.endpoints.chats.generate_with_ai")
     def test_generate_saves_messages(self, mock_ai, client: TestClient):

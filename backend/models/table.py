@@ -11,7 +11,7 @@ Table — bu chatga tegishli jadval.
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import String, DateTime, ForeignKey, func, Integer, JSON, Index
+from sqlalchemy import String, DateTime, ForeignKey, func, Integer, JSON, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base
@@ -72,6 +72,13 @@ class Table(Base):
         default=list,
     )
 
+    styles: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'"),
+    )
+
     source: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
@@ -126,6 +133,7 @@ class Table(Base):
             "title": self.title,
             "columns": self.columns,
             "rows": self.rows,
+            "styles": self.styles,
             "source": self.source,
             "version": self.version,
             "row_count": len(self.rows) if self.rows else 0,

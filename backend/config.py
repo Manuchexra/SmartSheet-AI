@@ -5,6 +5,7 @@ Konfiguratsiya moduli.
 ishlatiladigan yagona Settings obyektini yaratadi.
 """
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/smartsheet.db"
 
     # --- Cheklovlar ---
-    max_rows: int = 100
+    max_rows: int = Field(default=200, ge=1, le=200)
     max_columns: int = 20
     max_prompt_length: int = 2000
 

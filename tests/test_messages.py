@@ -80,12 +80,12 @@ class TestMessagesCRUD:
         assert response.status_code == 204
 
     def test_message_on_nonexistent_chat(self, client: TestClient):
-        """Yo'q chatga xabar qo'shish 400 qaytarishi kerak."""
+        """Yo'q yoki boshqa brauzerga tegishli chat 404 qaytarishi kerak."""
         response = client.post(
             "/api/v1/chats/99999/messages",
             json={"role": "user", "content": "Test"},
         )
-        assert response.status_code == 400
+        assert response.status_code == 404
 
     def test_chat_updated_at(self, client: TestClient):
         """Xabar qo'shilganda chat.updated_at yangilanishi kerak."""

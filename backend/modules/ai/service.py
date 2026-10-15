@@ -30,6 +30,8 @@ from backend.modules.ai.schemas import (
     AIResponse,
     AITimeoutError,
 )
+from backend.modules.styles.schemas import merge_style_overrides, normalize_styles
+from backend.modules.styles.service import apply_style_request
 
 
 logger = logging.getLogger(__name__)
@@ -88,16 +90,21 @@ DEMO_TEMPLATES: dict[str, dict] = {
     },
 }
 
-DEFAULT_DEMO = {
-    "title": "Namunaviy jadval",
-    "columns": ["№", "Nomi", "Tavsif", "Holat"],
-    "rows": [
-        [1, "Element 1", "Tavsif 1", "Faol"],
-        [2, "Element 2", "Tavsif 2", "Nofaol"],
-        [3, "Element 3", "Tavsif 3", "Faol"],
-    ],
-}
-
+SPREADSHEET_INTENT_TERMS = (
+    "jadval",
+    "ro'yxat",
+    "royxat",
+    "roʻyxat",
+    "ro‘yxat",
+    "table",
+    "spreadsheet",
+    "excel",
+    "sheet",
+    "ustun",
+    "qator",
+    "таблица",
+    "список",
+)
 
 # ============================================
 # ASOSIY FUNKSIYA
@@ -109,6 +116,10 @@ def generate_with_ai(request: AIRequest) -> tuple[AIResponse, str]:
     Returns:
         (AIResponse, source) — javob va manba ('ai' | 'demo').
     """
+    if not _is_spreadsheet_request(request.prompt):
+        logger.info("Jadval so'rovi aniqlanmadi — matn bitta katakka yoziladi")
+        return _get_text_response(request.prompt), "demo"
+
     if not is_ai_available():
         logger.info("AI mavjud emas — demo rejim")
         return _get_demo_response(request.prompt), "demo"
@@ -133,6 +144,24 @@ def is_ai_available() -> bool:
         settings.ai_api_key
         and settings.ai_provider
         and settings.ai_provider.lower() != "demo"
+    )
+
+
+def _is_spreadsheet_request(prompt: str) -> bool:
+    """Return whether a prompt clearly asks for spreadsheet data."""
+    normalized_prompt = prompt.casefold()
+    return any(term in normalized_prompt for term in SPREADSHEET_INTENT_TERMS) or any(
+        keyword in normalized_prompt for keyword in DEMO_TEMPLATES
+    )
+
+
+def _get_text_response(prompt: str) -> AIResponse:
+    """Preserve non-spreadsheet messages as a single cell instead of inventing data."""
+    text = prompt.strip()
+    return AIResponse(
+        title=text[:60] or "Xabar",
+        columns=["Matn"],
+        rows=[[text]],
     )
 
 
@@ -210,6 +239,7 @@ def _call_ai_provider(request: AIRequest) -> AIResponse:
             title=parsed.get("title", "Untitled"),
             columns=parsed.get("columns", []),
             rows=parsed.get("rows", []),
+            styles=parsed.get("styles"),
         )
     except Exception as e:
         raise AIInvalidResponseError(
@@ -273,12 +303,8 @@ def _get_demo_response(prompt: str) -> AIResponse:
                 rows=template["rows"],
             )
 
-    logger.info("Standart demo namuna qaytarildi")
-    return AIResponse(
-        title=DEFAULT_DEMO["title"],
-        columns=DEFAULT_DEMO["columns"],
-        rows=DEFAULT_DEMO["rows"],
-    )
+    logger.info("Mos demo jadval topilmadi — prompt matni saqlanadi")
+    return _get_text_response(prompt)
 
 
 # ============================================
@@ -314,6 +340,18 @@ def generate_edit_with_ai(
             table_json,
             existing_table,
         )
+        explicit_styles = apply_style_request(
+            user_request,
+            existing_table.get("columns", []),
+            existing_table.get("styles"),
+        )
+        if explicit_styles is not None:
+            response = AIResponse(
+                title=response.title,
+                columns=response.columns,
+                rows=response.rows,
+                styles=explicit_styles,
+            )
         return response, "ai"
     except (AITimeoutError, AIRateLimitError, AIInvalidResponseError) as e:
         logger.warning(f"AI edit xatosi: {e.code} — {e}")
@@ -395,6 +433,10 @@ def _call_ai_edit_provider(
             title=parsed.get("title", existing_table.get("title", "Untitled")),
             columns=parsed.get("columns", existing_table.get("columns", [])),
             rows=parsed.get("rows", existing_table.get("rows", [])),
+            styles=merge_style_overrides(
+                normalize_styles(existing_table.get("styles")),
+                parsed.get("styles", {}),
+            ),
         )
     except Exception as e:
         raise AIInvalidResponseError(f"AI javobi validatsiyadan o'tmadi: {e}") from e
@@ -417,6 +459,7 @@ def _get_demo_edit_response(
     title = existing_table.get("title", "Jadval")
     columns = existing_table.get("columns", [])
     rows = existing_table.get("rows", [])
+    styles = normalize_styles(existing_table.get("styles"))
 
     request_lower = user_request.lower()
 
@@ -435,8 +478,17 @@ def _get_demo_edit_response(
                 else:
                     new_row.append(cell)
             new_rows.append(new_row)
-        return AIResponse(title=title, columns=columns, rows=new_rows)
+        return AIResponse(title=title, columns=columns, rows=new_rows, styles=styles)
+
+    updated_styles = apply_style_request(user_request, columns, styles)
+    if updated_styles is not None:
+        return AIResponse(
+            title=title,
+            columns=columns,
+            rows=rows,
+            styles=updated_styles,
+        )
 
     # Boshqa so'rovlar — o'zgarishsiz qaytarish
     logger.info(f"Demo edit: o'zgarishsiz qaytarildi")
-    return AIResponse(title=title, columns=columns, rows=rows)
+    return AIResponse(title=title, columns=columns, rows=rows, styles=styles)

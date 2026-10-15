@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
+from backend.modules.chats.dependencies import get_browser_id
 from backend.modules.chats.service import get_chat
 from backend.modules.messages.schemas import (
     MessageCreate,
@@ -43,11 +44,12 @@ def list_messages_endpoint(
     chat_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> MessageListResponse:
     """Xabarlar ro'yxatini olish."""
     # Chat mavjudligini tekshirish
-    chat = get_chat(db, chat_id)
+    chat = get_chat(db, chat_id, browser_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -76,9 +78,15 @@ def list_messages_endpoint(
 def create_message_endpoint(
     chat_id: int,
     payload: MessageCreate,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> MessageResponse:
     """Yangi xabar yaratish."""
+    if not get_chat(db, chat_id, browser_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat topilmadi: id={chat_id}",
+        )
     try:
         message = create_message(
             db,
@@ -107,18 +115,19 @@ def create_message_endpoint(
 def delete_message_endpoint(
     chat_id: int,
     message_id: int,
+    browser_id: str = Depends(get_browser_id),
     db: Session = Depends(get_db),
 ) -> None:
     """Xabarni o'chirish."""
     # Chat mavjudligini tekshirish
-    chat = get_chat(db, chat_id)
+    chat = get_chat(db, chat_id, browser_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Chat topilmadi: id={chat_id}",
         )
 
-    deleted = delete_message(db, message_id)
+    deleted = delete_message(db, chat_id, message_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

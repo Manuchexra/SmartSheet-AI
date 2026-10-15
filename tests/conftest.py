@@ -8,6 +8,8 @@ Bu fayl barcha testlarda ishlatiladigan fixture'larni saqlaydi:
 - Mock AI (haqiqiy AI'ga so'rov yubormaslik uchun)
 """
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,13 +22,17 @@ from backend.modules.table_generator.schemas import TableData
 # FASTAPI TEST CLIENT
 # ============================================
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Iterator[TestClient]:
     """
     FastAPI TestClient.
 
     Haqiqiy server ishga tushirmasdan, HTTP so'rovlarni simulyatsiya qiladi.
     """
-    return TestClient(app)
+    with TestClient(
+        app,
+        headers={"X-Client-ID": "11111111-1111-4111-8111-111111111111"},
+    ) as test_client:
+        yield test_client
 
 
 # ============================================

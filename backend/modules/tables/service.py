@@ -16,6 +16,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.models import Table, Chat
+from backend.modules.styles.defaults import default_styles
+from backend.modules.styles.schemas import merge_style_overrides, normalize_styles
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ def create_table(
     title: str,
     columns: list,
     rows: list,
+    styles: dict | None = None,
     source: str = "ai",
 ) -> Table:
     """
@@ -58,6 +61,7 @@ def create_table(
         title=title,
         columns=columns,
         rows=rows,
+        styles=normalize_styles(styles) if styles is not None else default_styles(),
         source=source,
         version=1,
     )
@@ -96,6 +100,7 @@ def update_table(
     title: str | None = None,
     columns: list | None = None,
     rows: list | None = None,
+    styles: dict | None = None,
 ) -> Table | None:
     """
     Jadvalni tahrirlash.
@@ -115,6 +120,8 @@ def update_table(
         table.columns = columns
     if rows is not None:
         table.rows = rows
+    if styles is not None:
+        table.styles = merge_style_overrides(table.styles, styles)
 
     # Versiyani oshirish
     table.version += 1
@@ -137,6 +144,7 @@ def upsert_table(
     title: str,
     columns: list,
     rows: list,
+    styles: dict | None = None,
     source: str = "ai",
 ) -> Table:
     """
@@ -153,6 +161,7 @@ def upsert_table(
             title=title,
             columns=columns,
             rows=rows,
+            styles=styles,
         )
 
     return create_table(
@@ -161,6 +170,7 @@ def upsert_table(
         title=title,
         columns=columns,
         rows=rows,
+        styles=styles,
         source=source,
     )
 

@@ -14,6 +14,8 @@ from backend.modules.table_generator.schemas import (
     TableGenerateResponse,
 )
 from backend.modules.table_generator.service import build_table_response
+from backend.modules.ai.schemas import AIRequest
+from backend.config import settings
 
 
 # ============================================
@@ -84,6 +86,34 @@ class TestTableDataValidation:
                 columns=[f"C{i}" for i in range(25)],  # > 20
                 rows=[["1"] * 25],
             )
+
+    def test_accepts_200_rows(self, monkeypatch):
+        monkeypatch.setattr(settings, "max_rows", 200)
+        data = TableData(
+            title="200 qator",
+            columns=["Qiymat"],
+            rows=[[row] for row in range(200)],
+        )
+        assert data.row_count == 200
+
+    def test_rejects_more_than_200_rows(self, monkeypatch):
+        monkeypatch.setattr(settings, "max_rows", 200)
+        with pytest.raises(ValidationError, match="200 tadan oshmasligi"):
+            TableData(
+                title="201 qator",
+                columns=["Qiymat"],
+                rows=[[row] for row in range(201)],
+            )
+
+
+@pytest.mark.unit
+class TestAIRowLimit:
+    def test_default_limit_is_200(self):
+        assert AIRequest(prompt="Jadval yarat").max_rows == 200
+
+    def test_limit_cannot_exceed_200(self):
+        with pytest.raises(ValidationError):
+            AIRequest(prompt="Jadval yarat", max_rows=201)
 
 
 # ============================================

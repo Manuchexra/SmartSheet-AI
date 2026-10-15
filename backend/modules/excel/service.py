@@ -29,49 +29,10 @@ logger = logging.getLogger(__name__)
 # ============================================
 # FORMATLASH KONSTANTALARI
 # ============================================
-HEADER_FONT = Font(
-    name="Calibri",
-    size=11,
-    bold=True,
-    color="FFFFFF",
-)
-
-HEADER_FILL = PatternFill(
-    start_color="2563EB",  # primary blue
-    end_color="2563EB",
-    fill_type="solid",
-)
-
-HEADER_ALIGNMENT = Alignment(
-    horizontal="center",
-    vertical="center",
-    wrap_text=True,
-)
-
-HEADER_BORDER = Border(
-    left=Side(style="thin", color="1E40AF"),
-    right=Side(style="thin", color="1E40AF"),
-    top=Side(style="thin", color="1E40AF"),
-    bottom=Side(style="thin", color="1E40AF"),
-)
-
-CELL_ALIGNMENT = Alignment(
-    horizontal="left",
-    vertical="top",
-    wrap_text=False,
-)
-
-# Formula kataklari uchun font (ko'k, italic)
-FORMULA_FONT = Font(
-    name="Calibri",
-    size=11,
-    color="1E40AF",  # ko'k
-    italic=True,
-)
-
-FORMULA_FILL = PatternFill(
-    start_color="EFF6FF",  # och ko'k
-    end_color="EFF6FF",
+DEFAULT_FORMULA_FONT = Font(name="Calibri", size=11, color="FF1E40AF", italic=True)
+DEFAULT_FORMULA_FILL = PatternFill(
+    start_color="FFEFF6FF",
+    end_color="FFEFF6FF",
     fill_type="solid",
 )
 
@@ -113,15 +74,25 @@ def generate_excel(table_data: TableData) -> BytesIO:
     ws.title = _safe_sheet_title(table_data.title)
 
     # ============================================
+    styles = table_data.styles
+    body_style = styles["body"]
+    column_styles = styles["columns"]
+
     # 1. USTUN SARLAVHALARI (1-qator)
     # ============================================
     for col_idx, col_name in enumerate(table_data.columns, start=1):
         cell = ws.cell(row=1, column=col_idx)
         cell.value = _sanitize_value(col_name)
-        cell.font = HEADER_FONT
-        cell.fill = HEADER_FILL
-        cell.alignment = HEADER_ALIGNMENT
-        cell.border = HEADER_BORDER
+        header_style = _merge_styles(body_style, styles["header"])
+        header_style = _merge_styles(
+            header_style,
+            column_styles.get(col_name, {}),
+        )
+        header_style = _merge_styles(
+            header_style,
+            styles["cells"].get(f"0:{col_idx - 1}", {}),
+        )
+        _apply_cell_style(cell, header_style, wrap_text=True)
 
     # ============================================
     # 2. MA'LUMOTLAR (2-qatordan boshlab)
@@ -140,15 +111,30 @@ def generate_excel(table_data: TableData) -> BytesIO:
                 cell.value = value
 
                 # Formula kataklarini maxsus belgilash
-                cell.font = FORMULA_FONT
-                cell.fill = FORMULA_FILL
-                cell.alignment = CELL_ALIGNMENT
+                cell.font = DEFAULT_FORMULA_FONT
+                cell.fill = DEFAULT_FORMULA_FILL
 
                 formula_count += 1
             else:
                 # Oddiy qiymat
                 cell.value = _sanitize_value(value)
-                cell.alignment = CELL_ALIGNMENT
+
+            effective_style = _merge_styles(
+                body_style,
+                column_styles.get(table_data.columns[col_idx - 1], {}),
+            )
+            row_style = styles["rows"].get(str(row_idx - 2), {})
+            effective_style = _merge_styles(effective_style, row_style)
+            effective_style = _merge_styles(
+                effective_style,
+                styles["cells"].get(f"{row_idx - 1}:{col_idx - 1}", {}),
+            )
+            if styles["alternate_rows"] and (row_idx - 2) % 2 == 1:
+                effective_style = _merge_styles(
+                    {"bg_color": "#F8FAFC"},
+                    effective_style,
+                )
+            _apply_cell_style(cell, effective_style)
 
     # ============================================
     # 3. USTUN KENGLIKLARI
@@ -220,6 +206,52 @@ def _sanitize_value(value: Any) -> Any:
         return "'" + text
 
     return text
+
+
+def _merge_styles(base: dict, override: dict) -> dict:
+    """Overlay non-null style values while retaining unspecified defaults."""
+    return {**base, **{key: value for key, value in override.items() if value is not None}}
+
+
+def _apply_cell_style(cell, style: dict, wrap_text: bool = False) -> None:
+    if style.get("bg_color"):
+        color = _excel_color(style["bg_color"])
+        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+    if style.get("text_color") or style.get("font_size") or style.get("font_family") or (
+        "bold" in style or "italic" in style
+    ):
+        current = cell.font
+        cell.font = Font(
+            name=style.get("font_family", current.name or "Calibri"),
+            size=style.get("font_size", current.sz or 11),
+            bold=style.get("bold", current.bold),
+            italic=style.get("italic", current.italic),
+            color=_excel_color(style["text_color"])
+            if style.get("text_color")
+            else current.color,
+        )
+    cell.alignment = Alignment(
+        horizontal=style.get("alignment", "left"),
+        vertical=style.get("vertical_alignment", "top"),
+        wrap_text=wrap_text,
+    )
+
+    side_style = style.get("border_style", "thin")
+    side_color = _excel_color(style.get("border_color", "#000000"))
+    sides = set(style.get("border_sides", ["top", "bottom", "left", "right"]))
+    side_values = {}
+    for side_name in ("left", "right", "top", "bottom"):
+        if side_name in sides and side_style != "none":
+            side_values[side_name] = Side(style=side_style, color=side_color)
+        else:
+            side_values[side_name] = Side(style=None)
+    cell.border = Border(**side_values)
+
+
+def _excel_color(color: str) -> str:
+    """Convert #RRGGBB into the ARGB form required by openpyxl."""
+    value = color.lstrip("#")
+    return value if len(value) == 8 else f"FF{value}"
 
 
 def _is_formula(value: Any) -> bool:

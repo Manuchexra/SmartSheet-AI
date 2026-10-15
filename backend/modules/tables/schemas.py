@@ -12,6 +12,8 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backend.config import settings
+from backend.modules.styles.defaults import default_styles
+from backend.modules.styles.schemas import normalize_styles
 
 
 # ============================================
@@ -50,6 +52,11 @@ class TableCreate(BaseModel):
         description="Qatorlar",
     )
 
+    styles: dict = Field(
+        default_factory=default_styles,
+        description="Jadval uslublari",
+    )
+
     source: str = Field(
         default="ai",
         pattern="^(ai|demo|manual|upload)$",
@@ -81,6 +88,11 @@ class TableCreate(BaseModel):
             raise ValueError("Ustun nomlari takrorlanmasligi kerak")
 
         return cleaned
+
+    @field_validator("styles", mode="before")
+    @classmethod
+    def styles_valid(cls, value: dict | None) -> dict:
+        return normalize_styles(value)
 
     @model_validator(mode="after")
     def validate_structure(self) -> "TableCreate":
@@ -131,6 +143,15 @@ class TableUpdate(BaseModel):
         min_length=1,
     )
 
+    styles: Optional[dict] = None
+
+    @field_validator("styles", mode="before")
+    @classmethod
+    def styles_valid(cls, value: dict | None) -> dict | None:
+        if value is not None:
+            normalize_styles(value)
+        return value
+
 
 # ============================================
 # JADVAL — JAVOB
@@ -162,6 +183,7 @@ class TableResponse(BaseModel):
     title: str
     columns: list[Any]
     rows: list[Any]
+    styles: dict = Field(default_factory=default_styles)
     source: str
     version: int
     row_count: int
@@ -180,6 +202,7 @@ class TableResponse(BaseModel):
             title=table.title,
             columns=table.columns,
             rows=table.rows,
+            styles=normalize_styles(table.styles),
             source=table.source,
             version=table.version,
             row_count=len(table.rows) if table.rows else 0,

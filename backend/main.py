@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.router import api_router
 from backend.config import settings
+from backend.db.migrations import upgrade_database
 
 
 # ============================================
@@ -75,8 +76,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Client-ID"],
     max_age=600,  # 10 daqiqa preflight cache
 )
 
@@ -203,6 +204,7 @@ else:
 @app.on_event("startup")
 async def startup_event():
     """Ilova ishga tushganda holatini log qilish."""
+    upgrade_database()
     logger.info(f"🚀 {settings.app_name} ishga tushdi")
     logger.info(f"   Environment: {settings.app_env}")
     logger.info(f"   AI provider: {settings.ai_provider or 'DEMO rejim'}")

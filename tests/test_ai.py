@@ -22,8 +22,10 @@ from backend.modules.ai.schemas import (
 )
 from backend.modules.ai.service import (
     _get_demo_response,
+    _get_demo_edit_response,
     _parse_json_content,
     generate_edit_with_ai,
+    generate_with_ai,
     is_ai_available,
 )
 
@@ -121,15 +123,63 @@ class TestDemoResponse:
         result = _get_demo_response("loyihalar jadvali")
         assert "Loyiha" in result.title
 
-    def test_default(self):
-        """Mos kelmagan prompt standart namuna qaytarishi kerak."""
+    def test_non_spreadsheet_prompt_is_preserved_as_one_cell(self):
+        """Jadval so'ralmasa, demo uydirma ma'lumot yaratmasligi kerak."""
+        result = _get_demo_response("salom")
+        assert result.title == "salom"
+        assert result.columns == ["Matn"]
+        assert result.rows == [["salom"]]
+
+    def test_unmatched_prompt_is_preserved_as_one_cell(self):
+        """Mos demo shabloni topilmasa, foydalanuvchi matni saqlanishi kerak."""
         result = _get_demo_response("salom dunyo")
-        assert result.title == "Namunaviy jadval"
+        assert result.title == "salom dunyo"
+        assert result.rows == [["salom dunyo"]]
 
     def test_returns_ai_response(self):
         """Natija AIResponse bo'lishi kerak."""
         result = _get_demo_response("talabalar")
         assert isinstance(result, AIResponse)
+
+    def test_greeting_does_not_call_configured_ai_provider(self, monkeypatch):
+        """Salomlashuv AI'ga jadval so'rovi sifatida yuborilmasligi kerak."""
+        monkeypatch.setattr(
+            "backend.modules.ai.service.is_ai_available",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service._call_ai_provider",
+            lambda request: pytest.fail("Greeting was sent to the AI provider"),
+        )
+
+        response, source = generate_with_ai(AIRequest(prompt="salom"))
+
+        assert source == "demo"
+        assert response.title == "salom"
+        assert response.columns == ["Matn"]
+        assert response.rows == [["salom"]]
+
+    def test_spreadsheet_request_still_calls_configured_ai_provider(self, monkeypatch):
+        expected = AIResponse(
+            title="Xodimlar",
+            columns=["Ism"],
+            rows=[["Ali"]],
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.is_ai_available",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service._call_ai_provider",
+            lambda request: expected,
+        )
+
+        response, source = generate_with_ai(
+            AIRequest(prompt="Xodimlar jadvali tuz")
+        )
+
+        assert source == "ai"
+        assert response == expected
 
 
 # ============================================
@@ -193,6 +243,10 @@ class TestAIEdit:
             "title": "Xodimlar",
             "columns": ["Ism", "Maosh"],
             "rows": [["Ali", 5000]],
+            "styles": {
+                "header": {"bg_color": "#123456"},
+                "columns": {"Maosh": {"bg_color": "#16A34A"}},
+            },
         }
 
         class MockResponse:
@@ -244,6 +298,82 @@ class TestAIEdit:
         assert response.title == "Xodimlar"
         assert response.columns == ["Ism", "Maosh"]
         assert response.rows == [["Ali", 5500]]
+        assert response.styles.body.border_color == "#000000"
+        assert response.styles.header.bg_color == "#123456"
+        assert response.styles.columns["Maosh"].bg_color == "#16A34A"
+
+    def test_demo_edit_applies_column_color(self):
+        response = _get_demo_edit_response(
+            "Maosh ustunini yashil qil",
+            {
+                "title": "Xodimlar",
+                "columns": ["Ism", "Maosh"],
+                "rows": [["Ali", 5000]],
+                "styles": {},
+            },
+        )
+
+        assert response.styles.columns["Maosh"].bg_color == "#16A34A"
+
+    def test_ai_edit_targets_header_for_first_visible_row_request(self, monkeypatch):
+        class MockResponse:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {
+                    "choices": [{
+                        "message": {
+                            "content": (
+                                '{"rows":[["Ali",5000]],"styles":'
+                                '{"rows":{"0":{"bg_color":"#000000"},'
+                                '"1":{"bg_color":"#000000"}}}}'
+                            ),
+                        },
+                    }],
+                }
+
+        class MockClient:
+            def __init__(self, timeout):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            @staticmethod
+            def post(*args, **kwargs):
+                return MockResponse()
+
+        monkeypatch.setattr(
+            "backend.modules.ai.service.is_ai_available",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.settings.ai_api_url",
+            "https://example.test",
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.httpx.Client",
+            MockClient,
+        )
+
+        response, source = generate_edit_with_ai(
+            "1 - qatorni qora qil dedim ko'kda turganini",
+            {
+                "title": "Xodimlar",
+                "columns": ["Ism", "Maosh"],
+                "rows": [["Ali", 5000]],
+                "styles": {},
+            },
+        )
+
+        assert source == "ai"
+        assert response.styles.header.bg_color == "#000000"
+        assert response.styles.header.text_color == "#FFFFFF"
+        assert response.styles.rows == {}
 
 
 # ============================================

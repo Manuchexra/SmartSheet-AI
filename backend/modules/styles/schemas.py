@@ -73,6 +73,7 @@ class TableStyles(BaseModel):
     body: BodyStyle = Field(default_factory=BodyStyle)
     columns: dict[str, StyleRule] = Field(default_factory=dict)
     rows: dict[str, StyleRule] = Field(default_factory=dict)
+    cells: dict[str, StyleRule] = Field(default_factory=dict)
     alternate_rows: bool = False
 
     @field_validator("rows")
@@ -82,6 +83,15 @@ class TableStyles(BaseModel):
             raise ValueError("Qator uslubi indeksi 0 dan boshlangan butun son bo'lishi kerak")
         return value
 
+    @field_validator("cells")
+    @classmethod
+    def validate_cell_keys(cls, value: dict[str, StyleRule]) -> dict[str, StyleRule]:
+        if len(value) > 2100 or any(
+            not re.fullmatch(r"\d+:\d+", key) for key in value
+        ):
+            raise ValueError("Katak uslubi kaliti 'qator:ustun' formatida bo'lishi kerak")
+        return value
+
 
 def normalize_styles(styles: dict | TableStyles | None) -> dict:
     """Validate partial style input and fill unspecified options with defaults."""
@@ -89,4 +99,19 @@ def normalize_styles(styles: dict | TableStyles | None) -> dict:
         parsed = styles
     else:
         parsed = TableStyles.model_validate(styles or {})
-    return parsed.model_dump(mode="json")
+    return parsed.model_dump(mode="json", exclude_none=True)
+
+
+def merge_style_overrides(existing: dict | None, overrides: dict | None) -> dict:
+    """Apply partial style changes without resetting unrelated settings."""
+    merged = normalize_styles(existing)
+
+    def apply_overrides(target: dict, changes: dict) -> None:
+        for key, value in changes.items():
+            if isinstance(value, dict) and isinstance(target.get(key), dict):
+                apply_overrides(target[key], value)
+            else:
+                target[key] = value
+
+    apply_overrides(merged, overrides or {})
+    return normalize_styles(merged)

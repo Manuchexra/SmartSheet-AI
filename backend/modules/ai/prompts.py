@@ -22,24 +22,39 @@ The JSON must have this exact structure:
   "rows": [
     ["value1", "value2", "value3"],
     ["value4", "value5", "value6"]
-  ]
+  ],
+  "styles": {{
+    "header": {{"bg_color":"#2563EB","text_color":"#FFFFFF","bold":true,"font_size":12,"alignment":"center"}},
+    "body": {{"border_style":"thin","border_color":"#000000","border_sides":["top","bottom","left","right"]}},
+    "columns": {{}},
+    "rows": {{}},
+    "cells": {{}},
+    "alternate_rows": false
+  }}
 }}
 
 STRICT RULES:
 1. Output ONLY JSON — no text before or after
-2. "title" must be short (max 60 chars) in the same language as the user's prompt
-3. "columns" must be a list of column names (max {max_columns}, min 1)
-4. "rows" must be a list of rows, each row is a list of values
-5. Each row MUST have the SAME number of values as there are columns
-6. Respect the user's requested number of rows
-7. If no row count specified, generate 5-10 realistic rows
-8. Maximum {max_rows} rows total
-9. Column names should be in the SAME language as the user's prompt
-10. Values can be strings, numbers, or booleans
-11. Use realistic, plausible sample data
-12. DO NOT use placeholder text
-13. If the user requests specific columns, use EXACTLY those columns
-14. If the user requests specific number of rows, generate EXACTLY that many
+2. Only generate spreadsheet data when the user clearly asks for a table, list, spreadsheet, or structured data. For a greeting, unclear message, or request unrelated to a spreadsheet, preserve the user's exact text as a single value in one column and one row; do not invent sample data.
+3. "title" must be short (max 60 chars) in the same language as the user's prompt
+4. "columns" must be a list of column names (max {max_columns}, min 1)
+5. "rows" must be a list of rows, each row is a list of values
+6. Each row MUST have the SAME number of values as there are columns
+7. Respect the user's requested number of rows
+8. If no row count specified, generate 5-10 realistic rows
+9. Maximum {max_rows} rows total
+10. Column names should be in the SAME language as the user's prompt
+11. Values can be strings, numbers, or booleans
+12. Use realistic, plausible sample data
+13. DO NOT use placeholder text
+14. If the user requests specific columns, use EXACTLY those columns
+15. If the user requests specific number of rows, generate EXACTLY that many
+16. Always include a valid "styles" object. Use defaults unless the user requests visual formatting.
+17. For visual requests, change only the requested style properties and preserve all others.
+18. Use #RRGGBB colors, alignment left/center/right, and border_style none/hair/thin/medium/thick/double.
+19. "columns" style keys are exact column names; "rows" style keys are zero-based row indexes.
+20. "cells" style keys use zero-based "row:column" coordinates, with row 0 for the header.
+21. Default borders are black on all four sides; do not change them unless requested.
 
 EXCEL FORMULAS (VERY IMPORTANT):
 15. If the user asks for calculations (Jami, O'rtacha, Hisoblash, Total, Average, ...),
@@ -143,7 +158,15 @@ No explanations, no markdown, no code fences. Just raw JSON.
 {{
   "title": "...",
   "columns": [...],
-  "rows": [...]
+  "rows": [...],
+  "styles": {{
+    "header": {{"bg_color":"#2563EB","text_color":"#FFFFFF","bold":true,"font_size":12,"alignment":"center"}},
+    "body": {{"border_style":"thin","border_color":"#000000","border_sides":["top","bottom","left","right"]}},
+    "columns": {{}},
+    "rows": {{}},
+    "cells": {{}},
+    "alternate_rows": false
+  }}
 }}
 
 STRICT RULES:
@@ -157,6 +180,10 @@ STRICT RULES:
 8. Each row MUST have the SAME number of values as there are columns
 9. Preserve formulas as strings (starting with "=")
 10. If the user asks for a NEW table (unrelated to existing), create fresh content
+11. Always include the complete "styles" object. Preserve existing styles unless the user asks to change them.
+12. For visual requests, change only requested properties. The first visible row is the header: if the user refers to "1-qator" or the first row, style "header". "rows" keys are zero-based indexes for data rows only (the first data row is key "0").
+13. Use #RRGGBB colors, alignment left/center/right, and border_style none/hair/thin/medium/thick/double.
+14. Preserve any imported per-cell styles under the "cells" object and use zero-based "row:column" keys.
 
 EXAMPLES:
 

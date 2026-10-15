@@ -54,6 +54,7 @@ def build_table_response(
             title=ai_response.title,
             columns=ai_response.columns,
             rows=ai_response.rows,
+            styles=ai_response.styles,
         )
     except ValidationError as e:
         logger.error(f"AI javobi validatsiyadan o'tmadi: {e}")

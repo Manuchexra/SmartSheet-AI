@@ -24,12 +24,13 @@ logger = logging.getLogger(__name__)
 # ============================================
 # YANGI CHAT YARATISH
 # ============================================
-def create_chat(db: Session, title: str = "Yangi chat") -> Chat:
+def create_chat(db: Session, browser_id: str, title: str = "Yangi chat") -> Chat:
     """
     Yangi chat yaratish.
 
     Args:
         db: SQLAlchemy sessiyasi.
+        browser_id: Chat egasi bo'lgan brauzer identifikatori.
         title: Chat sarlavhasi.
 
     Returns:
@@ -39,14 +40,16 @@ def create_chat(db: Session, title: str = "Yangi chat") -> Chat:
         ValueError: Chatlar limiti tugagan bo'lsa.
     """
     # Limitni tekshirish
-    total = db.scalar(select(func.count()).select_from(Chat))
+    total = db.scalar(
+        select(func.count()).select_from(Chat).where(Chat.browser_id == browser_id)
+    )
     if total >= settings.max_chats:
         raise ValueError(
             f"Chatlar limiti tugagan ({settings.max_chats}). "
             f"Iltimos, ba'zilarini o'chiring."
         )
 
-    chat = Chat(title=title)
+    chat = Chat(title=title, browser_id=browser_id)
     db.add(chat)
     db.commit()
     db.refresh(chat)
@@ -58,18 +61,24 @@ def create_chat(db: Session, title: str = "Yangi chat") -> Chat:
 # ============================================
 # BITTA CHATNI OLISH
 # ============================================
-def get_chat(db: Session, chat_id: int) -> Chat | None:
+def get_chat(db: Session, chat_id: int, browser_id: str) -> Chat | None:
     """
     Chatni ID bo'yicha olish.
 
     Args:
         db: SQLAlchemy sessiyasi.
         chat_id: Chat ID.
+        browser_id: Chat egasi bo'lgan brauzer identifikatori.
 
     Returns:
         Chat yoki None (topilmasa).
     """
-    return db.get(Chat, chat_id)
+    return db.scalar(
+        select(Chat).where(
+            Chat.id == chat_id,
+            Chat.browser_id == browser_id,
+        )
+    )
 
 
 # ============================================
@@ -77,6 +86,7 @@ def get_chat(db: Session, chat_id: int) -> Chat | None:
 # ============================================
 def get_chats(
     db: Session,
+    browser_id: str,
     skip: int = 0,
     limit: int = 50,
 ) -> tuple[list[Chat], int]:
@@ -85,18 +95,27 @@ def get_chats(
 
     Args:
         db: SQLAlchemy sessiyasi.
+        browser_id: Chat egasi bo'lgan brauzer identifikatori.
         skip: Nechta o'tkazib yuborish.
         limit: Nechta olish.
 
     Returns:
         (chats, total) — chatlar ro'yxati va jami soni.
     """
-    # Jami soni
-    total = db.scalar(select(func.count()).select_from(Chat))
+    # Assign existing unowned chats to the first browser using the upgraded app.
+    db.query(Chat).filter(Chat.browser_id.is_(None)).update(
+        {Chat.browser_id: browser_id},
+        synchronize_session=False,
+    )
+    db.commit()
+
+    scope = Chat.browser_id == browser_id
+    total = db.scalar(select(func.count()).select_from(Chat).where(scope))
 
     # Chatlar (yangilangan vaqt bo'yicha teskari tartibda)
     stmt = (
         select(Chat)
+        .where(scope)
         .order_by(desc(Chat.updated_at))
         .offset(skip)
         .limit(limit)
@@ -112,6 +131,7 @@ def get_chats(
 def update_chat(
     db: Session,
     chat_id: int,
+    browser_id: str,
     title: str | None = None,
 ) -> Chat | None:
     """
@@ -120,12 +140,13 @@ def update_chat(
     Args:
         db: SQLAlchemy sessiyasi.
         chat_id: Chat ID.
+        browser_id: Chat egasi bo'lgan brauzer identifikatori.
         title: Yangi sarlavha (None bo'lsa, o'zgarmaydi).
 
     Returns:
         Chat yoki None (topilmasa).
     """
-    chat = db.get(Chat, chat_id)
+    chat = get_chat(db, chat_id, browser_id)
     if not chat:
         return None
 
@@ -142,7 +163,7 @@ def update_chat(
 # ============================================
 # CHATNI O'CHIRISH
 # ============================================
-def delete_chat(db: Session, chat_id: int) -> bool:
+def delete_chat(db: Session, chat_id: int, browser_id: str) -> bool:
     """
     Chatni o'chirish.
 
@@ -151,11 +172,12 @@ def delete_chat(db: Session, chat_id: int) -> bool:
     Args:
         db: SQLAlchemy sessiyasi.
         chat_id: Chat ID.
+        browser_id: Chat egasi bo'lgan brauzer identifikatori.
 
     Returns:
         True — o'chirildi, False — topilmadi.
     """
-    chat = db.get(Chat, chat_id)
+    chat = get_chat(db, chat_id, browser_id)
     if not chat:
         return False
 

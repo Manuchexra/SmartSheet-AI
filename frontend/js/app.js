@@ -49,6 +49,8 @@ const el = {
 
     // Chat footer
     promptInput: document.getElementById('prompt-input'),
+    tableFileInput: document.getElementById('table-file-input'),
+    uploadTableBtn: document.getElementById('upload-table-btn'),
     generateBtn: document.getElementById('generate-btn'),
     charCounter: document.getElementById('char-counter'),
 
@@ -60,6 +62,11 @@ const el = {
     deleteConfirmMessage: document.getElementById('delete-confirm-message'),
     deleteConfirmCancel: document.getElementById('delete-confirm-cancel'),
     deleteConfirmAccept: document.getElementById('delete-confirm-accept'),
+    excelSaveDialog: document.getElementById('excel-save-dialog'),
+    excelSaveForm: document.getElementById('excel-save-form'),
+    excelFilenameInput: document.getElementById('excel-filename-input'),
+    excelSaveError: document.getElementById('excel-save-error'),
+    excelSaveCancel: document.getElementById('excel-save-cancel'),
 };
 
 // ============================================
@@ -92,6 +99,8 @@ const state = {
 
     deleteConfirmationResolve: null,
     deleteConfirmationPreviousFocus: null,
+    excelSaveResolve: null,
+    excelSavePreviousFocus: null,
 };
 
 // ============================================
@@ -100,6 +109,15 @@ const state = {
 
 function deepClone(obj) {
     return JSON.parse(JSON.stringify(obj));
+}
+
+function sanitizeExcelFilename(name) {
+    return name
+        .trim()
+        .replace(/[<>:"\/\\|?*\u0000-\u001F]/g, '_')
+        .replace(/[. ]+$/g, '')
+        .replace(/(?:\.xlsx)+$/i, '')
+        .trim();
 }
 
 function isFormula(value) {
@@ -207,6 +225,59 @@ function handleDeleteDialogKeydown(event) {
     } else if (!event.shiftKey && document.activeElement === lastButton) {
         event.preventDefault();
         firstButton.focus();
+    }
+}
+
+function requestExcelFilename(defaultName) {
+    if (state.excelSaveResolve) return Promise.resolve(null);
+
+    state.excelSavePreviousFocus = document.activeElement;
+    el.excelFilenameInput.value = defaultName;
+    el.excelSaveError.textContent = '';
+    el.excelSaveError.hidden = true;
+    el.excelSaveDialog.hidden = false;
+    el.excelFilenameInput.focus();
+    el.excelFilenameInput.select();
+
+    return new Promise((resolve) => {
+        state.excelSaveResolve = resolve;
+    });
+}
+
+function finishExcelFilenameRequest(filename) {
+    if (!state.excelSaveResolve) return;
+
+    const resolve = state.excelSaveResolve;
+    const previousFocus = state.excelSavePreviousFocus;
+    state.excelSaveResolve = null;
+    state.excelSavePreviousFocus = null;
+    el.excelSaveDialog.hidden = true;
+    resolve(filename);
+
+    if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus();
+    }
+}
+
+function handleExcelSaveDialogKeydown(event) {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        finishExcelFilenameRequest(null);
+        return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const controls = [
+        el.excelFilenameInput,
+        el.excelSaveCancel,
+        el.excelSaveForm.querySelector('[type="submit"]'),
+    ];
+    if (event.shiftKey && document.activeElement === controls[0]) {
+        event.preventDefault();
+        controls[controls.length - 1].focus();
+    } else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) {
+        event.preventDefault();
+        controls[0].focus();
     }
 }
 
@@ -378,10 +449,18 @@ function renderTable(tableData, { preserveHistory = false } = {}) {
 
     // Thead
     el.tableHead.innerHTML = '';
+    const styles = tableData.styles || {};
+    const bodyStyle = styles.body || {};
     const headerRow = document.createElement('tr');
     (tableData.columns || []).forEach((col) => {
         const th = document.createElement('th');
         th.textContent = col;
+        applyCellStyle(th, {
+            ...bodyStyle,
+            ...(styles.header || {}),
+            ...((styles.columns || {})[col] || {}),
+            ...((styles.cells || {})[`0:${tableData.columns.indexOf(col)}`] || {}),
+        });
         headerRow.appendChild(th);
     });
     const thActions = document.createElement('th');
@@ -394,9 +473,19 @@ function renderTable(tableData, { preserveHistory = false } = {}) {
     (tableData.rows || []).forEach((row, rowIndex) => {
         const tr = document.createElement('tr');
         tr.dataset.rowIndex = String(rowIndex);
+        const rowStyle = (styles.rows || {})[String(rowIndex)] || {};
+        if (styles.alternate_rows && rowIndex % 2 === 1 && !rowStyle.bg_color) {
+            tr.style.backgroundColor = '#F8FAFC';
+        }
 
         row.forEach((cell, colIndex) => {
             const td = createEditableCell(cell, rowIndex, colIndex);
+            applyCellStyle(td, {
+                ...bodyStyle,
+                ...((styles.columns || {})[tableData.columns[colIndex]] || {}),
+                ...rowStyle,
+                ...((styles.cells || {})[`${rowIndex + 1}:${colIndex}`] || {}),
+            });
             tr.appendChild(td);
         });
 
@@ -410,6 +499,26 @@ function renderTable(tableData, { preserveHistory = false } = {}) {
     });
 
     el.tableSection.hidden = false;
+}
+
+function applyCellStyle(element, style) {
+    if (style.bg_color) element.style.backgroundColor = style.bg_color;
+    if (style.text_color) element.style.color = style.text_color;
+    if (style.bold !== undefined) element.style.fontWeight = style.bold ? 'bold' : 'normal';
+    if (style.italic !== undefined) element.style.fontStyle = style.italic ? 'italic' : 'normal';
+    if (style.font_size) element.style.fontSize = `${style.font_size}px`;
+    if (style.font_family) element.style.fontFamily = style.font_family;
+    if (style.alignment) element.style.textAlign = style.alignment;
+    if (style.vertical_alignment) element.style.verticalAlign = style.vertical_alignment;
+
+    const borderWidths = { none: '0', hair: '1px', thin: '1px', medium: '2px', thick: '3px', double: '3px' };
+    const borderStyles = { none: 'none', hair: 'dotted', thin: 'solid', medium: 'solid', thick: 'solid', double: 'double' };
+    const borderType = style.border_style || 'thin';
+    const border = `${borderWidths[borderType] || '1px'} ${borderStyles[borderType] || 'solid'} ${style.border_color || '#000000'}`;
+    const sides = style.border_sides || ['top', 'bottom', 'left', 'right'];
+    ['top', 'right', 'bottom', 'left'].forEach((side) => {
+        element.style[`border${side[0].toUpperCase()}${side.slice(1)}`] = sides.includes(side) ? border : 'none';
+    });
 }
 
 function createEditableCell(value, rowIndex, colIndex) {
@@ -770,6 +879,9 @@ async function handleDownloadExcel() {
         return;
     }
 
+    const filename = await requestExcelFilename(state.table.title || 'smartsheet');
+    if (filename === null) return;
+
     const btn = el.downloadExcelBtn;
     const labelEl = btn.querySelector('.btn__label');
     const originalLabel = labelEl ? labelEl.textContent : '';
@@ -782,12 +894,13 @@ async function handleDownloadExcel() {
             title: state.table.title,
             columns: state.table.columns,
             rows: state.table.rows,
+            styles: state.table.styles,
         });
 
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'smartsheet.xlsx';
+        a.download = `${filename}.xlsx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -800,6 +913,54 @@ async function handleDownloadExcel() {
     } finally {
         btn.disabled = false;
         if (labelEl) labelEl.textContent = originalLabel;
+    }
+}
+
+async function handleUploadTable(file) {
+    if (!file) return;
+    if (!/\.(xlsx|csv)$/i.test(file.name)) {
+        showAlert('Faqat .xlsx yoki .csv fayllarini yuklash mumkin.', 'error');
+        return;
+    }
+    if (!state.chatId) {
+        showAlert('Avval yangi chat oching, keyin faylni yuklang.', 'error');
+        return;
+    }
+
+    setLoading(true);
+    el.uploadTableBtn.disabled = true;
+    try {
+        const table = await window.API.Table.upload(state.chatId, file);
+        state.table = table;
+        state.originalTable = deepClone(table);
+        state.history = [];
+        state.redoHistory = [];
+        renderTable(table);
+        el.tableSection.hidden = false;
+
+        const chatTitle = state.chat?.title === 'Yangi chat'
+            ? table.title
+            : state.chat?.title;
+        state.chat = { ...state.chat, title: chatTitle };
+        el.chatTitle.value = chatTitle || '';
+        const messagesData = await window.API.Messages.list(state.chatId);
+        state.messages = messagesData.messages || [];
+        renderMessages();
+        scrollToBottom();
+        window.Sidebar.updateChat({
+            id: state.chatId,
+            title: chatTitle,
+            has_table: true,
+            message_count: state.messages.length,
+        });
+        showAlert(`"${table.title}" jadvali yuklandi. Uni chatda tahrirlashingiz mumkin.`, 'success');
+    } catch (err) {
+        console.error('Jadval yuklanmadi:', err);
+        showAlert(err.message || 'Jadval yuklanmadi', 'error');
+    } finally {
+        setLoading(false);
+        el.uploadTableBtn.disabled = false;
+        el.tableFileInput.value = '';
     }
 }
 
@@ -843,6 +1004,10 @@ function handleGlobalKeydown(event) {
 function bindEvents() {
     // Chat
     el.generateBtn.addEventListener('click', handleGenerate);
+    el.uploadTableBtn.addEventListener('click', () => el.tableFileInput.click());
+    el.tableFileInput.addEventListener('change', () => {
+        handleUploadTable(el.tableFileInput.files?.[0]);
+    });
     el.promptInput.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
@@ -876,6 +1041,29 @@ function bindEvents() {
         }
     });
     el.deleteConfirmDialog.addEventListener('keydown', handleDeleteDialogKeydown);
+    el.excelSaveCancel.addEventListener('click', () => {
+        finishExcelFilenameRequest(null);
+    });
+    el.excelSaveDialog.addEventListener('click', (event) => {
+        if (event.target === el.excelSaveDialog) {
+            finishExcelFilenameRequest(null);
+        }
+    });
+    el.excelSaveDialog.addEventListener('keydown', handleExcelSaveDialogKeydown);
+    el.excelFilenameInput.addEventListener('input', () => {
+        el.excelSaveError.hidden = true;
+    });
+    el.excelSaveForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const filename = sanitizeExcelFilename(el.excelFilenameInput.value);
+        if (!filename) {
+            el.excelSaveError.textContent = 'Fayl nomini kiriting.';
+            el.excelSaveError.hidden = false;
+            el.excelFilenameInput.focus();
+            return;
+        }
+        finishExcelFilenameRequest(filename);
+    });
 
     // Global
     document.addEventListener('keydown', handleGlobalKeydown);
