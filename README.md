@@ -41,7 +41,7 @@
 - 🤖 **AI orqali jadval yaratish** — tabiiy tildagi so'rovdan
 - 📊 **Brauzerda preview** — jadval darhol ko'rinadi
 - ✏️ **Tahrirlash** — kataklar, sarlavhalar, qatorlar
-- ↩️ **Undo** — oxirgi 20 amalni bekor qilish (`Ctrl+Z`)
+- ↩️ **Undo / Redo** — oxirgi 20 amalni bekor qilish va qayta tiklash (`Ctrl+Z` / `Ctrl+Y`)
 - ➕ **Qator qo'shish/o'chirish**
 - 📥 **Excel eksport** — `.xlsx` formatida yuklab olish
 - 🎯 **Demo rejim** — AI ishlamasa, namunaviy jadval

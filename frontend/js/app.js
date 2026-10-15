@@ -30,6 +30,7 @@ const el = {
     tableBody: document.getElementById('data-table-body'),
 
     undoBtn: document.getElementById('undo-btn'),
+    redoBtn: document.getElementById('redo-btn'),
     addRowBtn: document.getElementById('add-row-btn'),
     downloadExcelBtn: document.getElementById('download-excel-btn'),
 };
@@ -51,6 +52,12 @@ const state = {
      * @type {Array<{title: string, columns: string[], rows: any[][]}>}
      */
     history: [],
+
+    /**
+     * Bekor qilingan amallar uchun qayta tiklash stack'i.
+     * @type {Array<{title: string, columns: string[], rows: any[][]}>}
+     */
+    redoHistory: [],
 
     /**
      * Har bir katak uchun oxirgi commit qilingan qiymat.
@@ -182,10 +189,11 @@ function updateTableMeta() {
 }
 
 /**
- * Undo tugmasining holatini yangilash.
+ * Undo va redo tugmalarining holatini yangilash.
  */
-function updateUndoButton() {
+function updateHistoryButtons() {
     el.undoBtn.disabled = state.history.length === 0;
+    el.redoBtn.disabled = state.redoHistory.length === 0;
 }
 
 // ============================================
@@ -199,19 +207,34 @@ function updateUndoButton() {
 function pushToHistory() {
     if (!state.table) return;
 
-    const snapshot = {
-        title: state.table.title,
-        columns: [...state.table.columns],
-        rows: state.table.rows.map((row) => [...row]),
-    };
+    const snapshot = createTableSnapshot();
 
     state.history.push(snapshot);
+    state.redoHistory = [];
 
     if (state.history.length > MAX_HISTORY_SIZE) {
         state.history.shift();
     }
 
-    updateUndoButton();
+    updateHistoryButtons();
+}
+
+function createTableSnapshot() {
+    return {
+        title: state.table.title,
+        columns: [...state.table.columns],
+        rows: state.table.rows.map((row) => [...row]),
+    };
+}
+
+function restoreTableSnapshot(snapshot) {
+    state.table.title = snapshot.title;
+    state.table.columns = snapshot.columns;
+    state.table.rows = snapshot.rows;
+    state.table.row_count = snapshot.rows.length;
+    state.table.column_count = snapshot.columns.length;
+
+    renderTable(state.table, { keepHistory: true });
 }
 
 /**
@@ -224,18 +247,31 @@ function undo() {
         return;
     }
 
-    const snapshot = state.history.pop();
+    state.redoHistory.push(createTableSnapshot());
+    restoreTableSnapshot(state.history.pop());
 
-    state.table.title = snapshot.title;
-    state.table.columns = snapshot.columns;
-    state.table.rows = snapshot.rows;
-    state.table.row_count = snapshot.rows.length;
-    state.table.column_count = snapshot.columns.length;
-
-    renderTable(state.table, { keepHistory: true });
-
-    updateUndoButton();
+    updateHistoryButtons();
     showAlert('Oxirgi amal bekor qilindi.', 'info');
+}
+
+/**
+ * Redo — bekor qilingan oxirgi amalni qayta tiklash.
+ */
+function redo() {
+    if (state.redoHistory.length === 0) {
+        showAlert('Qayta tiklash uchun amal yo\'q.', 'info');
+        return;
+    }
+
+    state.history.push(createTableSnapshot());
+    if (state.history.length > MAX_HISTORY_SIZE) {
+        state.history.shift();
+    }
+
+    restoreTableSnapshot(state.redoHistory.pop());
+
+    updateHistoryButtons();
+    showAlert('Oxirgi amal qayta tiklandi.', 'info');
 }
 
 // ============================================
@@ -316,7 +352,8 @@ function renderTable(tableData, options = {}) {
     if (!keepHistory) {
         state.originalTable = deepClone(tableData);
         state.history = [];
-        updateUndoButton();
+        state.redoHistory = [];
+        updateHistoryButtons();
     }
 
     el.tableTitle.value = tableData.title;
@@ -564,18 +601,22 @@ async function handleDownloadExcel() {
 }
 
 // ============================================
-// CTRL+Z — GLOBAL KEYBOARD
+// UNDO/REDO — GLOBAL KEYBOARD
 // ============================================
 
 /**
- * Ctrl+Z / Cmd+Z ni ushlash.
+ * Ctrl+Z / Cmd+Z va Ctrl+Y / Cmd+Shift+Z ni ushlash.
  */
 function handleGlobalKeydown(event) {
     const isUndo = (event.ctrlKey || event.metaKey) &&
                    !event.shiftKey &&
                    event.key.toLowerCase() === 'z';
+    const isRedo = (event.ctrlKey && event.key.toLowerCase() === 'y') ||
+                   ((event.ctrlKey || event.metaKey) &&
+                    event.shiftKey &&
+                    event.key.toLowerCase() === 'z');
 
-    if (!isUndo) return;
+    if (!isUndo && !isRedo) return;
     if (!state.table) return;
 
     const tag = (event.target.tagName || '').toLowerCase();
@@ -586,12 +627,16 @@ function handleGlobalKeydown(event) {
     }
     if (isEditable && event.target.dataset.rowIndex) {
         event.preventDefault();
-        document.execCommand('undo');
+        document.execCommand(isUndo ? 'undo' : 'redo');
         return;
     }
 
     event.preventDefault();
-    undo();
+    if (isUndo) {
+        undo();
+    } else {
+        redo();
+    }
 }
 
 // ============================================
@@ -669,13 +714,14 @@ function bindEvents() {
 
     // Action panel
     el.undoBtn.addEventListener('click', undo);
+    el.redoBtn.addEventListener('click', redo);
     el.addRowBtn.addEventListener('click', handleAddRow);
     el.downloadExcelBtn.addEventListener('click', handleDownloadExcel);
 
     // Delete Row
     el.tableBody.addEventListener('click', handleDeleteRow);
 
-    // Ctrl+Z
+    // Undo/redo shortcuts
     document.addEventListener('keydown', handleGlobalKeydown);
 }
 
@@ -686,7 +732,7 @@ function bindEvents() {
 function init() {
     bindEvents();
     updateCharCounter();
-    updateUndoButton();
+    updateHistoryButtons();
     console.log('✅ SmartSheet AI frontend tayyor (7-bosqich)');
 }
 

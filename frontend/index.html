@@ -13,6 +13,9 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+    <!-- Skip link (accessibility) -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <!-- ============================================
          HEADER
          ============================================ -->
@@ -138,6 +141,16 @@
                         >
                             <span class="btn__icon" aria-hidden="true">↶</span>
                             <span class="btn__label">Undo</span>
+                        </button>
+                        <button
+                            id="redo-btn"
+                            class="btn btn--ghost"
+                            type="button"
+                            title="Redo last undone action (Ctrl+Y)"
+                            disabled
+                        >
+                            <span class="btn__icon" aria-hidden="true">↷</span>
+                            <span class="btn__label">Redo</span>
                         </button>
                         <button
                             id="add-row-btn"
