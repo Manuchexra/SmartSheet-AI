@@ -202,7 +202,7 @@ else:
 # ============================================
 @app.on_event("startup")
 async def startup_event():
-    """Ilova ishga tushganda log yozish."""
+    """Ilova ishga tushganda holatini log qilish."""
     logger.info(f"🚀 {settings.app_name} ishga tushdi")
     logger.info(f"   Environment: {settings.app_env}")
     logger.info(f"   AI provider: {settings.ai_provider or 'DEMO rejim'}")
@@ -212,6 +212,8 @@ async def startup_event():
     )
     logger.info(f"   Frontend: http://localhost:8000/")
     logger.info(f"   Docs: http://localhost:8000/docs")
-    logger.info(
-        f"   CORS origins: {allowed_origins if settings.app_env == 'development' else 'production mode'}"
-    )
+
+    # Ma'lumotlar bazasi sxemasini Alembic boshqaradi.
+    if settings.app_env == "development":
+        logger.info(f"   Database: {settings.database_url}")
+        logger.info(f"   Migratsiya: alembic upgrade head")

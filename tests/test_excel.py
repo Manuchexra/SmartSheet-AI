@@ -155,6 +155,25 @@ class TestExcelEndpoint:
         assert ws["A2"].value == "Ali"
         assert ws["B2"].value == 92
 
+    def test_export_formula_and_recalculate_on_open(self, client):
+        """Formulalar Excel'da formula bo'lib qolishi va ochilganda hisoblansin."""
+        response = client.post(
+            "/api/v1/excel/export",
+            json={
+                "title": "Test",
+                "columns": ["Qiymat"],
+                "rows": [[2], [3], ["=SUM(A2:A3)"]],
+            },
+        )
+        assert response.status_code == 200
+
+        wb = load_workbook(BytesIO(response.content))
+        ws = wb.active
+        assert ws["A4"].value == "=SUM(A2:A3)"
+        assert wb.calculation.calcMode == "auto"
+        assert wb.calculation.fullCalcOnLoad is True
+        assert wb.calculation.forceFullCalc is True
+
     def test_export_disposition(self, client):
         """Content-Disposition sarlavhasi to'g'ri bo'lishi kerak."""
         response = client.post(

@@ -11,8 +11,10 @@ services:
       - .env
     volumes:
       - ./backend:/app/backend
-      - ./frontend:/app/frontend    # ← YANGI
+      - ./frontend:/app/frontend
       - ./tests:/app/tests
+      - ./data:/app/data          # ← YANGI: SQLite fayli
+      - ./alembic:/app/alembic    # ← YANGI: Migratsiyalar
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]

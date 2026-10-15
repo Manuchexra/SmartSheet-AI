@@ -1,0 +1,30 @@
+# Alembic migratsiyalar
+
+Bu papkada ma'lumotlar bazasi migratsiyalari saqlanadi.
+
+## Buyruqlar
+
+```bash
+# Joriy versiyani ko'rish
+alembic current
+
+# Tarixni ko'rish
+alembic history
+
+# Yangi migratsiya yaratish (avtomatik)
+alembic revision --autogenerate -m "tavsif"
+
+# Yangi migratsiya yaratish (qo'lda)
+alembic revision -m "tavsif"
+
+# Eng oxirgi versiyaga o'tish
+alembic upgrade head
+
+# 1 qadam orqaga
+alembic downgrade -1
+
+# Muayyan versiyaga o'tish
+alembic upgrade <revision_id>
+
+# Muayyan versiyaga qaytish
+alembic downgrade <revision_id>

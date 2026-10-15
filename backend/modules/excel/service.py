@@ -4,8 +4,11 @@ Excel moduli xizmati.
 Bu modul:
 1. TableData'dan .xlsx fayl yaratadi.
 2. Ustun sarlavhalarini yozadi.
-3. Formatlash qo'llaydi (qalin sarlavha, kenglik, filter, freeze).
-4. Faylni BytesIO sifatida qaytaradi (yuklab olish uchun).
+3. Formulalarni Excel formulalari sifatida yozadi.
+4. Formatlash qo'llaydi (qalin sarlavha, kenglik, filter, freeze).
+5. Faylni BytesIO sifatida qaytaradi (yuklab olish uchun).
+
+11-bosqich: Excel formulalar qo'llab-quvvatlanadi.
 """
 
 import logging
@@ -15,8 +18,8 @@ from typing import Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.dimensions import ColumnDimension
 
+from backend.modules.formulas.service import is_formula_safe
 from backend.modules.table_generator.schemas import TableData
 
 
@@ -58,6 +61,20 @@ CELL_ALIGNMENT = Alignment(
     wrap_text=False,
 )
 
+# Formula kataklari uchun font (ko'k, italic)
+FORMULA_FONT = Font(
+    name="Calibri",
+    size=11,
+    color="1E40AF",  # ko'k
+    italic=True,
+)
+
+FORMULA_FILL = PatternFill(
+    start_color="EFF6FF",  # och ko'k
+    end_color="EFF6FF",
+    fill_type="solid",
+)
+
 # Xavfli Excel formulalar (formula injection oldini olish)
 # Agar katak shu belgilardan biri bilan boshlansa, apostrof qo'shamiz
 DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -70,11 +87,14 @@ def generate_excel(table_data: TableData) -> BytesIO:
     """
     TableData'dan Excel fayl yaratish.
 
+    Formulalar (="..." bilan boshlanadigan) Excel formulalari sifatida yoziladi.
+    Ular Excel'da ochilganda avtomatik hisoblanadi.
+
     Args:
         table_data: Validatsiyadan o'tgan jadval.
 
     Returns:
-        BytesIO — fayl baytlari (yuklab olish uchun).
+        BytesIO — fayl baytlari.
 
     Raises:
         ValueError: Jadval bo'sh bo'lsa.
@@ -85,8 +105,10 @@ def generate_excel(table_data: TableData) -> BytesIO:
     if not table_data.rows:
         raise ValueError("Qatorlar bo'sh — Excel yaratib bo'lmaydi")
 
-    # Yangi workbook
     wb = Workbook()
+    wb.calculation.fullCalcOnLoad = True
+    wb.calculation.forceFullCalc = True
+    wb.calculation.calcMode = "auto"
     ws = wb.active
     ws.title = _safe_sheet_title(table_data.title)
 
@@ -104,14 +126,32 @@ def generate_excel(table_data: TableData) -> BytesIO:
     # ============================================
     # 2. MA'LUMOTLAR (2-qatordan boshlab)
     # ============================================
+    formula_count = 0
+
     for row_idx, row in enumerate(table_data.rows, start=2):
         for col_idx, value in enumerate(row, start=1):
             cell = ws.cell(row=row_idx, column=col_idx)
-            cell.value = _sanitize_value(value)
-            cell.alignment = CELL_ALIGNMENT
+
+            # ============================================
+            # FORMULA EKANLIGINI TEKSHIRISH
+            # ============================================
+            if _is_formula(value) and is_formula_safe(value):
+                # Excel formula sifatida yozish
+                cell.value = value
+
+                # Formula kataklarini maxsus belgilash
+                cell.font = FORMULA_FONT
+                cell.fill = FORMULA_FILL
+                cell.alignment = CELL_ALIGNMENT
+
+                formula_count += 1
+            else:
+                # Oddiy qiymat
+                cell.value = _sanitize_value(value)
+                cell.alignment = CELL_ALIGNMENT
 
     # ============================================
-    # 3. USTUN KENGLIKLARINI MOSLASHTIRISH
+    # 3. USTUN KENGLIKLARI
     # ============================================
     for col_idx in range(1, len(table_data.columns) + 1):
         letter = get_column_letter(col_idx)
@@ -143,11 +183,12 @@ def generate_excel(table_data: TableData) -> BytesIO:
     # ============================================
     buffer = BytesIO()
     wb.save(buffer)
-    buffer.seek(0)  # boshidan o'qish uchun
+    buffer.seek(0)
 
     logger.info(
         f"Excel yaratildi: '{table_data.title}' — "
-        f"{table_data.row_count} qator × {table_data.column_count} ustun"
+        f"{table_data.row_count} qator × {table_data.column_count} ustun, "
+        f"formulalar: {formula_count}"
     )
 
     return buffer
@@ -159,6 +200,9 @@ def generate_excel(table_data: TableData) -> BytesIO:
 def _sanitize_value(value: Any) -> Any:
     """
     Xavfli Excel formulalarini neytrallashtirish.
+
+    Diqqat: bu funksiya FAQAT oddiy qiymatlar uchun.
+    Formulalar alohida ishlanadi (ularni apostrof qo'shish mumkin emas).
 
     Agar qiymat '=', '+', '-', '@', '\\t', '\\r' bilan boshlansa,
     oldiga apostrof qo'shamiz — Excel uni matn deb o'qiydi.
@@ -178,10 +222,24 @@ def _sanitize_value(value: Any) -> Any:
     return text
 
 
+def _is_formula(value: Any) -> bool:
+    """
+    Qiymat formula ekanligini tekshirish.
+
+    Formula = "=" bilan boshlanadi va uzunligi 1 dan katta.
+    """
+    return (
+        isinstance(value, str)
+        and value.startswith("=")
+        and len(value) > 1
+    )
+
+
 def _calculate_column_width(header: str, values: list) -> float:
     """
     Ustun kengligini hisoblash.
 
+    Formula uchun kengroq (natija uzunroq bo'lishi mumkin).
     Sarlavha va qiymatlar orasidagi maksimal uzunlik + padding.
     """
     header_len = len(str(header)) if header else 0
@@ -190,9 +248,14 @@ def _calculate_column_width(header: str, values: list) -> float:
     for v in values[:50]:  # Faqat birinchi 50 qatorni tekshiramiz (tezlik uchun)
         if v is None:
             continue
-        # Raqamlar uchun kenglik kichikroq
+
         text = str(v)
-        max_value_len = max(max_value_len, len(text))
+
+        # Formula bo'lsa — o'rtacha kenglik (natija qisqaroq)
+        if _is_formula(v):
+            max_value_len = max(max_value_len, min(len(text), 25))
+        else:
+            max_value_len = max(max_value_len, len(text))
 
     # Sarlavha + 4 belgi padding, minimal 10, maksimal 50
     width = max(header_len + 4, max_value_len + 2, 10)

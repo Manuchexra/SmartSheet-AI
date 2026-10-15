@@ -39,3 +39,16 @@ htmlcov/
 
 # --- Docker ---
 docker-compose.override.yml
+
+# --- Ma'lumotlar bazasi (12-bosqich) ---
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+
+# --- Alembic ---
+# alembic/versions/*.py — Git'ga QO'SHILADI (migratsiyalar kod)
+# Faqat vaqtinchalik fayllarni o'chirish:
+alembic/versions/__pycache__/

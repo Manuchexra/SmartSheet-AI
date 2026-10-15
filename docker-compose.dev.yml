@@ -5,8 +5,10 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./backend:/app/backend
-      - ./frontend:/app/frontend    # ← allaqachon bor edi
+      - ./frontend:/app/frontend
       - ./tests:/app/tests
+      - ./data:/app/data          # ← YANGI
+      - ./alembic:/app/alembic    # ← YANGI
     environment:
       - APP_ENV=development
       - PYTHONUNBUFFERED=1

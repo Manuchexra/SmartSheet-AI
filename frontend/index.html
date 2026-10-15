@@ -3,177 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SmartSheet AI — Turn your ideas into Excel spreadsheets">
-    <title>SmartSheet AI — AI-Powered Spreadsheet Generator</title>
-    
-    <!-- Logo (favicon) -->
+    <meta name="description" content="SmartSheet AI — AI-Powered Spreadsheet Generator">
+    <title>SmartSheet AI — Chat</title>
+
+    <!-- Logo -->
     <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
-    
+
     <!-- CSS -->
     <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
-    <!-- Skip link (accessibility) -->
-    <a href="#main-content" class="skip-link">Skip to main content</a>
+<body class="app-layout">
 
     <!-- ============================================
-         HEADER
+         SIDEBAR (chap panel)
          ============================================ -->
-    <header class="header">
-        <div class="header__container">
-            <div class="header__brand">
-                <img src="/assets/logo.svg" alt="SmartSheet AI" class="header__logo">
-                <div class="header__text">
-                    <h1 class="header__title">SmartSheet AI</h1>
-                    <p class="header__subtitle">Turn your ideas into Excel spreadsheets</p>
-                </div>
-            </div>
+    <aside class="sidebar" id="sidebar">
+        <!-- Sidebar header -->
+        <div class="sidebar__header">
+            <a href="/" class="sidebar__brand">
+                <img src="/assets/logo.svg" alt="SmartSheet AI" class="sidebar__logo">
+                <span class="sidebar__title">SmartSheet AI</span>
+            </a>
             <span class="badge badge--mvp">MVP</span>
         </div>
-    </header>
+
+        <!-- Yangi chat tugmasi -->
+        <button id="new-chat-btn" class="btn btn--primary btn--block" type="button">
+            <span class="btn__icon" aria-hidden="true">＋</span>
+            <span class="btn__label">Yangi chat</span>
+        </button>
+
+        <!-- Chatlar ro'yxati -->
+        <div class="sidebar__chats" id="chat-list">
+            <!-- Bo'sh holat -->
+            <div class="sidebar__empty" id="chat-list-empty">
+                <p>Hali chat yo'q</p>
+                <p class="sidebar__empty-hint">Yangi chat yarating</p>
+            </div>
+        </div>
+
+        <!-- Sidebar footer -->
+        <div class="sidebar__footer">
+            <a href="/docs" target="_blank" class="sidebar__link">
+                📚 API docs
+            </a>
+        </div>
+    </aside>
 
     <!-- ============================================
-         MAIN
+         MAIN (o'ng panel)
          ============================================ -->
     <main class="main">
-        <div class="container">
+        <!-- Mobile menu toggle -->
+        <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Menu">
+            ☰
+        </button>
 
-            <!-- ============================================
-                 PROMPT SECTION
-                 ============================================ -->
-            <section class="card prompt-section">
-                <div class="card__header">
-                    <h2 class="card__title">What would you like to create?</h2>
-                    <p class="card__subtitle">
-                        Describe your spreadsheet in plain language — 
-                        AI will build the structure for you.
-                    </p>
+        <!-- ============================================
+             EMPTY STATE (chat tanlanmagan)
+             ============================================ -->
+        <div id="empty-state" class="empty-state empty-state--main">
+            <div class="empty-state__icon" aria-hidden="true">📊</div>
+            <h3 class="empty-state__title">Chat tanlang</h3>
+            <p class="empty-state__text">
+                Chap tomondan chat tanlang yoki
+                <strong>Yangi chat</strong> yarating.
+            </p>
+        </div>
+
+        <!-- ============================================
+             CHAT VIEW
+             ============================================ -->
+        <div id="chat-view" class="chat-view" hidden>
+
+            <!-- Chat header -->
+            <header class="chat-header">
+                <input
+                    type="text"
+                    id="chat-title"
+                    class="chat-header__title"
+                    value=""
+                    maxlength="200"
+                    placeholder="Chat nomi"
+                    aria-label="Chat nomi"
+                >
+                <div class="chat-header__actions">
+                    <button
+                        id="download-excel-btn"
+                        class="btn btn--ghost btn--sm"
+                        type="button"
+                        title="Excel yuklab olish"
+                    >
+                        <span class="btn__icon" aria-hidden="true">⬇</span>
+                        <span class="btn__label">Excel</span>
+                    </button>
+                    <button
+                        id="delete-chat-btn"
+                        class="btn btn--ghost btn--sm btn--danger"
+                        type="button"
+                        title="Chatni o'chirish"
+                    >
+                        <span class="btn__icon" aria-hidden="true">🗑</span>
+                    </button>
                 </div>
+            </header>
 
-                <div class="card__body">
-                    <label for="prompt-input" class="sr-only">Prompt</label>
-                    <textarea
-                        id="prompt-input"
-                        class="prompt-input"
-                        placeholder="Misol: Talabalar uchun jadval yarat. Ism, familiya, fan, ball va natija ustunlari bo'lsin. 10 ta namunaviy qator qo'sh."
-                        rows="4"
-                        maxlength="2000"
-                    ></textarea>
+            <!-- Chat body (scroll area) -->
+            <div class="chat-body" id="chat-body">
 
-                    <div class="prompt-section__footer">
-                        <div class="prompt-section__hint">
-                            <span id="char-counter" class="char-counter">0 / 2000</span>
+                <!-- ============================================
+                     JADVAL SECTION
+                     ============================================ -->
+                <div id="table-section" class="chat-table-section" hidden>
+                    <div class="chat-table-header">
+                        <div>
+                            <h3 id="table-title" class="chat-table-title">—</h3>
+                            <p class="chat-table-meta">
+                                <span id="table-meta">—</span>
+                                <span id="table-edited-indicator" class="edited-indicator" hidden>
+                                    · o'zgartirilgan
+                                </span>
+                            </p>
                         </div>
-                        <button
-                            id="generate-btn"
-                            class="btn btn--primary"
-                            type="button"
-                        >
-                            <span class="btn__icon" aria-hidden="true">✨</span>
-                            <span class="btn__label">Generate Table</span>
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ============================================
-                 ALERT (xatolik/xabar ko'rsatish)
-                 ============================================ -->
-            <div id="alert" class="alert" role="alert" hidden>
-                <span class="alert__icon" aria-hidden="true">⚠️</span>
-                <span class="alert__message" id="alert-message"></span>
-                <button class="alert__close" id="alert-close" aria-label="Close">×</button>
-            </div>
-
-            <!-- ============================================
-                 LOADING
-                 ============================================ -->
-            <div id="loading" class="loading" hidden>
-                <div class="spinner" aria-hidden="true"></div>
-                <p class="loading__text">Generating your table...</p>
-            </div>
-
-            <!-- ============================================
-                 EMPTY STATE (jadval hali yo'q)
-                 ============================================ -->
-            <section id="empty-state" class="empty-state">
-                <div class="empty-state__icon" aria-hidden="true">📊</div>
-                <h3 class="empty-state__title">No table yet</h3>
-                <p class="empty-state__text">
-                    Describe what you need above and click <strong>Generate Table</strong>.
-                </p>
-            </section>
-
-            <!-- ============================================
-                 TABLE PREVIEW (6-bosqich: Action Panel qo'shildi)
-                 ============================================ -->
-            <section id="table-section" class="card table-section" hidden>
-                <div class="card__header table-section__header">
-                    <div class="table-section__title-group">
-                        <!-- Jadval nomi — tahrirlanadigan -->
-                        <input
-                            type="text"
-                            id="table-title"
-                            class="table-title-input"
-                            value="—"
-                            maxlength="200"
-                            aria-label="Table title"
-                            placeholder="Untitled table"
-                        >
-                        <p class="card__subtitle">
-                            <span id="table-meta">—</span>
-                            <span id="table-edited-indicator" class="edited-indicator" hidden>
-                                · o'zgartirilgan
-                            </span>
-                        </p>
+                        <div class="action-panel">
+                            <button
+                                id="undo-btn"
+                                class="btn btn--ghost btn--sm"
+                                type="button"
+                                title="Undo (Ctrl+Z)"
+                                disabled
+                            >
+                                <span class="btn__icon" aria-hidden="true">↶</span>
+                                <span class="btn__label">Undo</span>
+                            </button>
+                            <button
+                                id="redo-btn"
+                                class="btn btn--ghost btn--sm"
+                                type="button"
+                                title="Redo (Ctrl+Y)"
+                                disabled
+                            >
+                                <span class="btn__icon" aria-hidden="true">↷</span>
+                                <span class="btn__label">Redo</span>
+                            </button>
+                            <button
+                                id="add-row-btn"
+                                class="btn btn--ghost btn--sm"
+                                type="button"
+                                title="Qator qo'shish"
+                            >
+                                <span class="btn__icon" aria-hidden="true">＋</span>
+                                <span class="btn__label">Qator</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- ============================================
-                         ACTION PANEL (YANGI — 6-bosqich)
-                         ============================================ -->
-                    <div class="action-panel">
-                        <button
-                            id="undo-btn"
-                            class="btn btn--ghost"
-                            type="button"
-                            title="Undo last action (Ctrl+Z)"
-                            disabled
-                        >
-                            <span class="btn__icon" aria-hidden="true">↶</span>
-                            <span class="btn__label">Undo</span>
-                        </button>
-                        <button
-                            id="redo-btn"
-                            class="btn btn--ghost"
-                            type="button"
-                            title="Redo last undone action (Ctrl+Y)"
-                            disabled
-                        >
-                            <span class="btn__icon" aria-hidden="true">↷</span>
-                            <span class="btn__label">Redo</span>
-                        </button>
-                        <button
-                            id="add-row-btn"
-                            class="btn btn--ghost"
-                            type="button"
-                            title="Add a new row"
-                        >
-                            <span class="btn__icon" aria-hidden="true">＋</span>
-                            <span class="btn__label">Add Row</span>
-                        </button>
-                        <button
-                            id="download-excel-btn"
-                            class="btn btn--primary"
-                            type="button"
-                            title="Download as Excel (.xlsx)"
-                        >
-                            <span class="btn__icon" aria-hidden="true">📥</span>
-                            <span class="btn__label">Download Excel</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="card__body">
                     <div class="table-wrapper">
                         <table id="data-table" class="data-table">
                             <thead id="data-table-head"></thead>
@@ -181,25 +165,89 @@
                         </table>
                     </div>
                 </div>
-            </section>
+
+                <!-- ============================================
+                     XABARLAR TARIXI
+                     ============================================ -->
+                <div id="messages-list" class="messages-list"></div>
+
+                <!-- Loading -->
+                <div id="loading" class="loading loading--inline" hidden>
+                    <div class="spinner" aria-hidden="true"></div>
+                    <p class="loading__text">AI o'ylayapti...</p>
+                </div>
+
+            </div>
+
+            <!-- Chat footer (xabar yozish) -->
+            <footer class="chat-footer">
+                <div class="chat-input-wrapper">
+                    <label for="prompt-input" class="sr-only">Xabar</label>
+                    <textarea
+                        id="prompt-input"
+                        class="chat-input"
+                        placeholder="Xabar yozing... (Ctrl+Enter yuborish)"
+                        rows="1"
+                        maxlength="2000"
+                    ></textarea>
+                    <button
+                        id="generate-btn"
+                        class="btn btn--primary btn--icon"
+                        type="button"
+                        aria-label="Yuborish"
+                    >
+                        <span class="btn__icon" aria-hidden="true">↑</span>
+                    </button>
+                </div>
+                <div class="chat-footer__hint">
+                    <span id="char-counter" class="char-counter">0 / 2000</span>
+                </div>
+            </footer>
 
         </div>
+
+        <!-- ============================================
+             ALERT (floating)
+             ============================================ -->
+        <div id="alert" class="alert alert--floating" role="alert" hidden>
+            <span class="alert__icon" aria-hidden="true">⚠️</span>
+            <span class="alert__message" id="alert-message"></span>
+            <button class="alert__close" id="alert-close" type="button" aria-label="Close">×</button>
+        </div>
+
     </main>
 
-    <!-- ============================================
-         FOOTER
-         ============================================ -->
-    <footer class="footer">
-        <div class="footer__container">
-            <p class="footer__text">
-                SmartSheet AI &copy; 2024 — MVP 1.0
-            </p>
+    <div
+        id="delete-confirm-dialog"
+        class="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-confirm-title"
+        aria-describedby="delete-confirm-message"
+        hidden
+    >
+        <div class="confirm-dialog__panel">
+            <div class="confirm-dialog__icon" aria-hidden="true">!</div>
+            <h2 id="delete-confirm-title" class="confirm-dialog__title">Chatni o'chirish</h2>
+            <p id="delete-confirm-message" class="confirm-dialog__message"></p>
+            <div class="confirm-dialog__actions">
+                <button id="delete-confirm-cancel" class="btn btn--ghost" type="button">
+                    Bekor qilish
+                </button>
+                <button id="delete-confirm-accept" class="btn btn--danger-solid" type="button">
+                    O'chirish
+                </button>
+            </div>
         </div>
-    </footer>
+    </div>
 
     <!-- ============================================
          SCRIPTS
          ============================================ -->
+    <script src="/js/api.js"></script>
+    <script src="/js/formula-eval.js"></script>
+    <script src="/js/sidebar.js"></script>
     <script src="/js/app.js"></script>
+
 </body>
 </html>

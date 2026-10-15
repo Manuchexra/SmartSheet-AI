@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     ai_model: str = ""
     ai_api_url: str = ""
 
+    # --- Ma'lumotlar bazasi (12-bosqich) ---
+    database_url: str = "sqlite:///./data/smartsheet.db"
+
     # --- Cheklovlar ---
     max_rows: int = 100
     max_columns: int = 20
@@ -30,6 +33,10 @@ class Settings(BaseSettings):
 
     # --- Undo tarixi ---
     max_history_size: int = 20
+
+    # --- Chat sozlamalari (12-bosqich) ---
+    max_chats: int = 100  # Foydalanuvchi uchun maksimal chatlar
+    max_messages_per_chat: int = 50
 
     # Pydantic sozlamalari
     model_config = SettingsConfigDict(

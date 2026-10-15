@@ -23,6 +23,7 @@ from backend.modules.ai.schemas import (
 from backend.modules.ai.service import (
     _get_demo_response,
     _parse_json_content,
+    generate_edit_with_ai,
     is_ai_available,
 )
 
@@ -177,6 +178,72 @@ class TestIsAiAvailable:
             "groq",
         )
         assert is_ai_available() is True
+
+
+# ============================================
+# AI EDIT
+# ============================================
+@pytest.mark.unit
+class TestAIEdit:
+    """Mavjud jadvalni AI orqali tahrirlash."""
+
+    def test_edit_response_uses_existing_values_as_defaults(self, monkeypatch):
+        """AI maydonni qaytarmasa, mavjud jadval qiymati saqlansin."""
+        existing_table = {
+            "title": "Xodimlar",
+            "columns": ["Ism", "Maosh"],
+            "rows": [["Ali", 5000]],
+        }
+
+        class MockResponse:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {
+                    "choices": [{
+                        "message": {
+                            "content": '{"rows":[["Ali",5500]]}',
+                        },
+                    }],
+                }
+
+        class MockClient:
+            def __init__(self, timeout):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            @staticmethod
+            def post(*args, **kwargs):
+                return MockResponse()
+
+        monkeypatch.setattr(
+            "backend.modules.ai.service.is_ai_available",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.settings.ai_api_url",
+            "https://example.test",
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.httpx.Client",
+            MockClient,
+        )
+
+        response, source = generate_edit_with_ai(
+            "Maoshni oshir",
+            existing_table,
+        )
+
+        assert source == "ai"
+        assert response.title == "Xodimlar"
+        assert response.columns == ["Ism", "Maosh"]
+        assert response.rows == [["Ali", 5500]]
 
 
 # ============================================

@@ -15,7 +15,13 @@ import re
 import httpx
 
 from backend.config import settings
-from backend.modules.ai.prompts import build_system_prompt, build_user_prompt
+from backend.modules.ai.prompts import (
+    build_edit_system_prompt,
+    build_edit_user_prompt,
+    build_system_prompt,
+    build_user_prompt,
+)
+
 from backend.modules.ai.schemas import (
     AIError,
     AIInvalidResponseError,
@@ -273,3 +279,164 @@ def _get_demo_response(prompt: str) -> AIResponse:
         columns=DEFAULT_DEMO["columns"],
         rows=DEFAULT_DEMO["rows"],
     )
+
+
+# ============================================
+# AI EDIT (12.7-bosqich)
+# ============================================
+def generate_edit_with_ai(
+    user_request: str,
+    existing_table: dict,
+) -> tuple[AIResponse, str]:
+    """
+    Mavjud jadvalni AI orqali tahrirlash.
+
+    Args:
+        user_request: Foydalanuvchi so'rovi (masalan, "Maoshni 10% oshir")
+        existing_table: Mavjud jadval dict ko'rinishida
+            {"title": "...", "columns": [...], "rows": [...]}
+
+    Returns:
+        (AIResponse, source) — yangilangan jadval va manba.
+    """
+    if not is_ai_available():
+        logger.info("AI mavjud emas — demo edit")
+        return _get_demo_edit_response(user_request, existing_table), "demo"
+
+    # JSON'ni string'ga aylantirish (AI'ga yuborish uchun)
+    import json
+    table_json = json.dumps(existing_table, ensure_ascii=False, indent=2)
+
+    # AI'ga so'rov
+    try:
+        response = _call_ai_edit_provider(
+            user_request,
+            table_json,
+            existing_table,
+        )
+        return response, "ai"
+    except (AITimeoutError, AIRateLimitError, AIInvalidResponseError) as e:
+        logger.warning(f"AI edit xatosi: {e.code} — {e}")
+        raise
+    except AIError as e:
+        logger.warning(f"AI edit xatosi: {e.code} — {e}")
+        raise
+    except Exception as e:
+        logger.error(f"AI edit kutilmagan xato: {e}", exc_info=True)
+        raise AIError(f"AI edit xatosi: {e}") from e
+
+
+def _call_ai_edit_provider(
+    user_request: str,
+    table_json: str,
+    existing_table: dict,
+) -> AIResponse:
+    """AI provayderiga edit so'rovini yuborish."""
+    if not settings.ai_api_url:
+        raise AIError("AI_API_URL sozlanmagan")
+
+    headers = {
+        "Authorization": f"Bearer {settings.ai_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": settings.ai_model,
+        "messages": [
+            {"role": "system", "content": build_edit_system_prompt()},
+            {
+                "role": "user",
+                "content": build_edit_user_prompt(table_json, user_request),
+            },
+        ],
+        "temperature": 0.2,  # Past harorat — aniqroq
+        "max_tokens": 4000,
+        "response_format": {"type": "json_object"},
+    }
+
+    logger.info(f"AI edit so'rovi: model={settings.ai_model}")
+
+    # HTTP so'rov
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(
+                settings.ai_api_url,
+                headers=headers,
+                json=payload,
+            )
+    except httpx.TimeoutException as e:
+        raise AITimeoutError() from e
+    except httpx.ConnectError as e:
+        raise AIError("AI xizmatiga ulanib bo'lmadi") from e
+    except httpx.HTTPError as e:
+        raise AIError(f"AI so'rovida xato: {e}") from e
+
+    # Status
+    if response.status_code == 429:
+        raise AIRateLimitError()
+    if response.status_code == 401:
+        raise AIError("AI API kaliti noto'g'ri")
+    if response.status_code >= 500:
+        raise AIError(f"AI provayderida xato: {response.status_code}")
+    if response.status_code != 200:
+        raise AIError(f"AI javobi: {response.status_code} — {response.text[:200]}")
+
+    # Parse
+    try:
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+    except (json.JSONDecodeError, KeyError, IndexError) as e:
+        raise AIInvalidResponseError("AI javob formati noto'g'ri") from e
+
+    parsed = _parse_json_content(content)
+
+    try:
+        return AIResponse(
+            title=parsed.get("title", existing_table.get("title", "Untitled")),
+            columns=parsed.get("columns", existing_table.get("columns", [])),
+            rows=parsed.get("rows", existing_table.get("rows", [])),
+        )
+    except Exception as e:
+        raise AIInvalidResponseError(f"AI javobi validatsiyadan o'tmadi: {e}") from e
+
+
+def _get_demo_edit_response(
+    user_request: str,
+    existing_table: dict,
+) -> AIResponse:
+    """
+    Demo edit — AI mavjud emas.
+
+    Oddiy o'zgartirishlarni qo'llab-quvvatlaydi:
+    - "10% oshir" — raqamlarni 10% oshirish
+    - "rangini o'zgartir" — o'zgarishsiz qaytarish
+    - boshqa — o'zgarishsiz qaytarish
+    """
+    import re
+
+    title = existing_table.get("title", "Jadval")
+    columns = existing_table.get("columns", [])
+    rows = existing_table.get("rows", [])
+
+    request_lower = user_request.lower()
+
+    # "10% oshir" kabi so'rovlarni qayta ishlash
+    percent_match = re.search(r"(\d+)\s*%", request_lower)
+    if percent_match and any(
+        kw in request_lower for kw in ["oshir", "ko'paytir", "increase", "qo'sh"]
+    ):
+        percent = int(percent_match.group(1)) / 100
+        new_rows = []
+        for row in rows:
+            new_row = []
+            for cell in row:
+                if isinstance(cell, (int, float)):
+                    new_row.append(round(cell * (1 + percent), 2))
+                else:
+                    new_row.append(cell)
+            new_rows.append(new_row)
+        return AIResponse(title=title, columns=columns, rows=new_rows)
+
+    # Boshqa so'rovlar — o'zgarishsiz qaytarish
+    logger.info(f"Demo edit: o'zgarishsiz qaytarildi")
+    return AIResponse(title=title, columns=columns, rows=rows)

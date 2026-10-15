@@ -52,3 +52,11 @@ README.md
 
 # Frontend (backend image'ida kerak emas)
 # frontend/
+
+# Ma'lumotlar bazasi
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
