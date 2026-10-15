@@ -9,6 +9,7 @@ Bu testlar:
 """
 
 import json
+from unittest.mock import Mock
 
 import pytest
 
@@ -21,6 +22,7 @@ from backend.modules.ai.schemas import (
     AITimeoutError,
 )
 from backend.modules.ai.service import (
+    _call_ai_provider,
     _get_demo_response,
     _get_demo_edit_response,
     _parse_json_content,
@@ -94,6 +96,48 @@ class TestParseJsonContent:
         result = _parse_json_content(content)
         assert result["title"] == "Test"
         assert len(result["rows"]) == 2
+
+
+@pytest.mark.unit
+class TestCallAIProvider:
+    def test_empty_rows_create_one_blank_editable_row(self, monkeypatch):
+        columns = ["Ism", "Familiya", "Yosh", "Yo'nalish", "Ish vaqti", "Maosh"]
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "title": "Xodimlar ro'yxati",
+                                "columns": columns,
+                                "rows": [],
+                                "styles": None,
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        client = Mock()
+        client.__enter__ = Mock(return_value=client)
+        client.__exit__ = Mock(return_value=False)
+        client.post.return_value = response
+        client_factory = Mock(return_value=client)
+
+        monkeypatch.setattr(
+            "backend.modules.ai.service.settings.ai_api_url",
+            "https://ai.test",
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.httpx.Client",
+            client_factory,
+        )
+
+        response = _call_ai_provider(AIRequest(prompt="Xodimlar ro'yxati jadvali"))
+
+        assert response.columns == columns
+        assert response.rows == [[""] * len(columns)]
 
 
 # ============================================
@@ -236,6 +280,58 @@ class TestIsAiAvailable:
 @pytest.mark.unit
 class TestAIEdit:
     """Mavjud jadvalni AI orqali tahrirlash."""
+
+    def test_edit_with_empty_rows_returns_blank_row_for_new_columns(self, monkeypatch):
+        columns = ["Ism", "Familiya", "Yosh", "Yo'nalish", "Ish vaqti", "Maosh"]
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "title": "Xodimlar ro'yxati",
+                                "columns": columns,
+                                "rows": [],
+                                "styles": None,
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        client = Mock()
+        client.__enter__ = Mock(return_value=client)
+        client.__exit__ = Mock(return_value=False)
+        client.post.return_value = response
+        client_factory = Mock(return_value=client)
+
+        monkeypatch.setattr(
+            "backend.modules.ai.service.is_ai_available",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.settings.ai_api_url",
+            "https://example.test",
+        )
+        monkeypatch.setattr(
+            "backend.modules.ai.service.httpx.Client",
+            client_factory,
+        )
+
+        result, source = generate_edit_with_ai(
+            "6 ta ustunli xodimlar jadvali yarat",
+            {
+                "title": "Salom",
+                "columns": ["Matn"],
+                "rows": [["salom"]],
+                "styles": {},
+            },
+        )
+
+        assert source == "ai"
+        assert result.columns == columns
+        assert result.rows == [[""] * len(columns)]
 
     def test_edit_response_uses_existing_values_as_defaults(self, monkeypatch):
         """AI maydonni qaytarmasa, mavjud jadval qiymati saqlansin."""

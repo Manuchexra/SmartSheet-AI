@@ -233,13 +233,17 @@ def _call_ai_provider(request: AIRequest) -> AIResponse:
         raise AIInvalidResponseError("AI javob formati noto'g'ri") from e
 
     parsed = _parse_json_content(content)
+    columns = parsed.get("columns", [])
+    rows = parsed.get("rows", [])
+    if isinstance(columns, list) and columns and rows == []:
+        rows = [[""] * len(columns)]
 
     try:
         return AIResponse(
             title=parsed.get("title", "Untitled"),
-            columns=parsed.get("columns", []),
-            rows=parsed.get("rows", []),
-            styles=parsed.get("styles"),
+            columns=columns,
+            rows=rows,
+            styles=parsed.get("styles") or {},
         )
     except Exception as e:
         raise AIInvalidResponseError(
@@ -427,12 +431,16 @@ def _call_ai_edit_provider(
         raise AIInvalidResponseError("AI javob formati noto'g'ri") from e
 
     parsed = _parse_json_content(content)
+    columns = parsed.get("columns", existing_table.get("columns", []))
+    rows = parsed.get("rows", existing_table.get("rows", []))
+    if isinstance(columns, list) and columns and rows == []:
+        rows = [[""] * len(columns)]
 
     try:
         return AIResponse(
             title=parsed.get("title", existing_table.get("title", "Untitled")),
-            columns=parsed.get("columns", existing_table.get("columns", [])),
-            rows=parsed.get("rows", existing_table.get("rows", [])),
+            columns=columns,
+            rows=rows,
             styles=merge_style_overrides(
                 normalize_styles(existing_table.get("styles")),
                 parsed.get("styles", {}),
